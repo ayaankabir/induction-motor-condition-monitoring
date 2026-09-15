@@ -5,6 +5,10 @@ from imcm.validation.equivalent_circuit import (
     equivalent_circuit_point,
 )
 from imcm.validation.frequency import interpolated_rfft_peak_hz, mean_zero_crossing_frequency_hz
+from imcm.validation.fault_metrics import (
+    StatorResistanceComparisonMetrics,
+    compare_stator_resistance_cases,
+)
 from imcm.validation.power_balance import power_balance_window
 
 __all__ = [
@@ -12,5 +16,7 @@ __all__ = [
     "equivalent_circuit_point",
     "interpolated_rfft_peak_hz",
     "mean_zero_crossing_frequency_hz",
+    "StatorResistanceComparisonMetrics",
+    "compare_stator_resistance_cases",
     "power_balance_window",
 ]

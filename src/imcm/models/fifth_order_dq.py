@@ -18,6 +18,7 @@ from imcm.models.flux_map import (
 )
 from imcm.models.operating_scenario import OperatingScenario, first_milestone_scenario
 from imcm.models.parameters import InductionMotorParameters, illustrative_4kw_400v_50hz_4pole
+from imcm.models.stator_resistance import phase_resistances_abc, resistive_drop_qd
 from imcm.signals.park import CONVENTION_NAME, balanced_phase_voltages, qd0_to_abc
 
 STATE_NAMES = ("lambda_qs", "lambda_ds", "lambda_qr", "lambda_dr", "omega_m")
@@ -84,10 +85,9 @@ def healthy_state_derivative(
 ) -> np.ndarray:
     """Right-hand side of the fifth-order healthy plant.
 
-    ``t`` is unused because the synchronous-frame voltages are constant DC, but
-    it is kept so ``solve_ivp`` can call this as ``fun(t, y)``.
+    ``t`` supplies the synchronous angle for an active phase-resistance
+    imbalance; it is otherwise kept for ``solve_ivp`` compatibility.
     """
-    del t
     lam_qs, lam_ds, lam_qr, lam_dr, omega_m = x
     omega = scenario.supply.omega_e
     v_qs = scenario.supply.phase_peak_v
@@ -96,8 +96,18 @@ def healthy_state_derivative(
     i_qs, i_ds, i_qr, i_dr = currents_from_fluxes(
         lam_qs, lam_ds, lam_qr, lam_dr, params
     )
-    p_lam_qs = v_qs - params.r_s * i_qs - omega * lam_ds
-    p_lam_ds = v_ds - params.r_s * i_ds + omega * lam_qs
+    r_abc = phase_resistances_abc(
+        params.r_s,
+        enabled=scenario.stator_resistance.enabled,
+        multipliers_abc=scenario.stator_resistance.multipliers_abc,
+    )
+    if r_abc[0] == r_abc[1] == r_abc[2]:
+        # Preserve the approved healthy scalar path exactly for balanced values.
+        v_rqs, v_rds = r_abc[0] * i_qs, r_abc[0] * i_ds
+    else:
+        v_rqs, v_rds = resistive_drop_qd(i_qs, i_ds, omega * t, r_abc)
+    p_lam_qs = v_qs - v_rqs - omega * lam_ds
+    p_lam_ds = v_ds - v_rds + omega * lam_qs
     p_lam_qr = -params.r_r * i_qr - (omega - omega_r) * lam_dr
     p_lam_dr = -params.r_r * i_dr + (omega - omega_r) * lam_qr
     tau_e = electromagnetic_torque_flux_current(
@@ -209,7 +219,7 @@ def simulate_healthy(
 
     rec = _reconstruct(sol.t, sol.y, params, scenario)
     metadata: dict[str, Any] = {
-        "label": "healthy",
+        "label": "healthy" if not scenario.stator_resistance.enabled else scenario.stator_resistance.label,
         "provenance": "simulated",
         "parameter_name": params.name,
         "parameter_provenance": params.provenance,
@@ -229,8 +239,14 @@ def simulate_healthy(
         "supply_frequency_hz": scenario.supply.frequency_hz,
         "load_type": scenario.load.load_type,
         "load_torque_nm": scenario.load.torque_nm,
+        "stator_resistance_case": scenario.stator_resistance.label,
+        "stator_resistances_abc_ohm": phase_resistances_abc(
+            params.r_s,
+            enabled=scenario.stator_resistance.enabled,
+            multipliers_abc=scenario.stator_resistance.multipliers_abc,
+        ),
         "inverter": False,
-        "faults": False,
+        "faults": scenario.stator_resistance.enabled,
         "experimental_validation": False,
     }
     return HealthySimulationResult(

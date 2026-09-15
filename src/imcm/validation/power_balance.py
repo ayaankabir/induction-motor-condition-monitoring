@@ -13,6 +13,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from imcm.models.fifth_order_dq import HealthySimulationResult
+from imcm.models.stator_resistance import phase_resistances_abc, resistance_matrix_qd
 
 
 @dataclass(frozen=True)
@@ -37,10 +38,27 @@ def magnetic_energy(result: HealthySimulationResult) -> np.ndarray:
 
 def instantaneous_powers(result: HealthySimulationResult) -> dict[str, np.ndarray]:
     p_in = 1.5 * (result.v_qs * result.i_qs + result.v_ds * result.i_ds)
-    p_cu = 1.5 * (
-        result.params.r_s * (result.i_qs**2 + result.i_ds**2)
-        + result.params.r_r * (result.i_qr**2 + result.i_dr**2)
+    r_abc = phase_resistances_abc(
+        result.params.r_s,
+        enabled=result.scenario.stator_resistance.enabled,
+        multipliers_abc=result.scenario.stator_resistance.multipliers_abc,
     )
+    if r_abc[0] == r_abc[1] == r_abc[2]:
+        p_cu_stator = 1.5 * r_abc[0] * (result.i_qs**2 + result.i_ds**2)
+    else:
+        theta = result.scenario.supply.omega_e * result.t
+        p_cu_stator = np.fromiter(
+            (
+                1.5
+                * np.array((i_qs, i_ds))
+                @ resistance_matrix_qd(angle, r_abc)
+                @ np.array((i_qs, i_ds))
+                for i_qs, i_ds, angle in zip(result.i_qs, result.i_ds, theta)
+            ),
+            dtype=float,
+            count=result.t.size,
+        )
+    p_cu = p_cu_stator + 1.5 * result.params.r_r * (result.i_qr**2 + result.i_dr**2)
     p_mech = result.tau_e * result.omega_m
     w_mag = magnetic_energy(result)
     p_mag = np.gradient(w_mag, result.t)
