@@ -52,15 +52,17 @@ speed initial state; RK45 with `max_step=1e-4 s`, `rtol=1e-6`, `atol=1e-8`; and
 ## Simulated observations
 
 The matched experiment (`experiments/run_fault_01_stator_resistance_imbalance.py`)
-uses the late 0.8--1.0 s window. With the illustrative parameters, it produced:
+uses the half-open late window \(0.8\leq t<1.0\) s. This spans ten 50 Hz cycles
+without double-counting the endpoint sample. With the illustrative parameters,
+it produced:
 
 | Metric | Healthy | Fault 01 (+10% phase A) |
 | --- | ---: | ---: |
-| Phase RMS currents, A (a, b, c) | (5.5652, 5.5666, 5.5643) | (5.5315, 5.6309, 5.5337) |
-| Current unbalance | 0.0430% | 1.7847% |
-| Negative-sequence magnitude | 0.00278 A | 0.06697 A |
-| Negative/positive sequence | 0.0500% | 1.2034% |
-| Electromagnetic torque-ripple RMS | 0.0000063 N m | 0.1901 N m |
+| Phase RMS currents, A (a, b, c) | (5.5654, 5.5654, 5.5654) | (5.5317, 5.6296, 5.5348) |
+| Current unbalance | 0.0000014% | 1.7592% |
+| Negative-sequence magnitude | 0.000000047 A | 0.06444 A |
+| Negative/positive sequence | 0.00000084% | 1.1579% |
+| Electromagnetic torque-ripple RMS | 0.0000063 N m | 0.19009 N m |
 | Final speed difference, fault minus healthy | -- | +0.2413 r/min |
 | Final slip difference, fault minus healthy | -- | -0.0001609 |
 
@@ -87,7 +89,13 @@ not be described as one.
 - The scenario assumes isolated-neutral, three-wire operation, so
   \(i_a+i_b+i_c=0\).
 - The negative-sequence metric uses an RMS phasor estimate over ten complete
-  50 Hz cycles. It is a controlled simulated indicator, not a classifier.
+  50 Hz cycles, with the half-open sample convention above. It is a controlled
+  simulated indicator, not a classifier.
+- Automated numerical convergence compares normal RK45 (`max_step=1e-4 s`,
+  `rtol=1e-6`, `atol=1e-8`) to a tight run (`max_step=1e-5 s`, `rtol=1e-9`,
+  `atol=1e-11`). Absolute agreement limits are: 1e-5 percentage points for
+  current unbalance, 1e-6 A for negative sequence, 1e-6 N m for torque ripple,
+  1e-5 r/min for final speed difference, and 1e-8 for final slip difference.
 - Supply unbalance, load variation, temperature effects, and measurement noise
   can also cause current unbalance; this model does not establish uniqueness.
 
@@ -97,4 +105,5 @@ The results above are **simulation evidence** for this exact parameter change.
 They are not experimental validation or proof of real-world fault-detection
 capability. Such validation would require measurements from a known-resistance
 condition with independently recorded supply, load, temperature, and fault
-provenance.
+provenance. Numerical convergence only establishes stability of this solver and
+model configuration; it does not supply experimental evidence.

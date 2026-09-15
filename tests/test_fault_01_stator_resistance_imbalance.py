@@ -11,7 +11,7 @@ from imcm.models.operating_scenario import (
 from imcm.models.parameters import illustrative_4kw_400v_50hz_4pole
 from imcm.models.stator_resistance import phase_resistances_abc, resistance_matrix_qd
 from imcm.signals.park import abc_to_qd0, qd0_to_abc
-from imcm.validation.fault_metrics import compare_stator_resistance_cases
+from imcm.validation.fault_metrics import CONVERGENCE_TOLERANCES, compare_stator_resistance_cases
 from imcm.validation.power_balance import power_balance_window
 
 
@@ -73,3 +73,21 @@ def test_fault_01_power_balance_uses_phase_specific_resistance() -> None:
     pb = power_balance_window(fault, t_start=0.8)
     assert pb.residual_rel < 1e-6
     assert abs(pb.p_mag_dot_mean) < 1.0
+
+
+def test_fault_01_metrics_converge_with_tighter_rk45_settings() -> None:
+    normal_kwargs = dict(t_end=1.0, max_step=1.0e-4, output_dt=1.0e-4, rtol=1.0e-6, atol=1.0e-8)
+    tight_kwargs = dict(t_end=1.0, max_step=1.0e-5, output_dt=1.0e-4, rtol=1.0e-9, atol=1.0e-11)
+    normal = compare_stator_resistance_cases(
+        simulate_healthy(scenario=first_milestone_scenario(), **normal_kwargs),
+        simulate_healthy(scenario=fault_01_phase_a_resistance_imbalance_scenario(), **normal_kwargs),
+    )
+    tight = compare_stator_resistance_cases(
+        simulate_healthy(scenario=first_milestone_scenario(), **tight_kwargs),
+        simulate_healthy(scenario=fault_01_phase_a_resistance_imbalance_scenario(), **tight_kwargs),
+    )
+    assert abs(normal.current_unbalance_fault_pct - tight.current_unbalance_fault_pct) < CONVERGENCE_TOLERANCES["current_unbalance_pct"]
+    assert abs(normal.negative_sequence_fault_a - tight.negative_sequence_fault_a) < CONVERGENCE_TOLERANCES["negative_sequence_a"]
+    assert abs(normal.torque_ripple_fault_nm - tight.torque_ripple_fault_nm) < CONVERGENCE_TOLERANCES["torque_ripple_nm"]
+    assert abs(normal.final_speed_difference_rpm - tight.final_speed_difference_rpm) < CONVERGENCE_TOLERANCES["final_speed_difference_rpm"]
+    assert abs(normal.final_slip_difference - tight.final_slip_difference) < CONVERGENCE_TOLERANCES["final_slip_difference"]

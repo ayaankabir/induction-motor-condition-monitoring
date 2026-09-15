@@ -85,7 +85,8 @@ Healthy and fault cases must differ only in \(\mathbf R_{s,abc}\), with identica
 - zero fluxes and \(\omega_m(0)=0\);
 - RK45: `max_step=1e-4 s`, `rtol=1e-6`, `atol=1e-8`, output interval `1e-4 s`;
 - 1.0 s duration; and
-- reporting windows, including \(t\in[0.8,1.0]\) s (ten 50 Hz cycles).
+- the half-open reporting window \(0.8\leq t<1.0\) s (ten 50 Hz cycles,
+  without a duplicate endpoint sample).
 
 Record case ID, all phase resistances, solver configuration, initial-condition
 label, and provenance. Use the same parameter object apart from an explicit
@@ -144,7 +145,8 @@ needs measurements with independent fault and operating-condition provenance.
 7. Do not use the current balanced scalar T-equivalent-circuit check as a
    fault-case validator; extend it for unbalance or mark it healthy-only.
 8. Repeat matched cases with tighter RK45 tolerances and smaller `max_step`, and
-   assert convergence of all four indicators.
+   assert convergence of all reported indicators using documented absolute
+   tolerances. This is now an automated regression test.
 
 ## Evidence hierarchy
 
