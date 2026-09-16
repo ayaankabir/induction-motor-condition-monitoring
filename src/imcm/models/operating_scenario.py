@@ -122,3 +122,37 @@ def fault_01_phase_a_resistance_imbalance_scenario() -> OperatingScenario:
             label="fault_01_phase_a_plus_10pct",
         ),
     )
+
+
+def fault_02_increased_mechanical_load_scenario() -> OperatingScenario:
+    """Controlled Condition 02: 50% higher constant mechanical load torque.
+
+    This is an operating-condition change, not a confirmed internal motor
+    fault. Supply, Park convention, motor parameters, and stator resistance
+    remain identical to the approved healthy baseline. Only the constant
+    mechanical load torque changes from 15.0 N m to 22.5 N m.
+    """
+    healthy = first_milestone_scenario()
+    return OperatingScenario(
+        name="fault_02_increased_mechanical_load_plus_50pct",
+        supply=healthy.supply,
+        load=LoadConfig(
+            load_type="constant_torque",
+            torque_nm=1.5 * healthy.load.torque_nm,
+            notes=(
+                "Controlled operating-condition change: 50% higher constant "
+                "mechanical load torque than the healthy baseline. "
+                "Simulation-only; not a confirmed internal motor fault."
+            ),
+        ),
+        park_convention=healthy.park_convention,
+        stator_resistance=StatorResistanceConfig(
+            enabled=False,
+            multipliers_abc=(1.0, 1.0, 1.0),
+            label="healthy_balanced",
+        ),
+        notes=(
+            "Controlled operating-condition change, not a confirmed internal "
+            "motor fault; simulation-only."
+        ),
+    )
