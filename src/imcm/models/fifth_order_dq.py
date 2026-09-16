@@ -19,7 +19,8 @@ from imcm.models.flux_map import (
 from imcm.models.operating_scenario import OperatingScenario, first_milestone_scenario
 from imcm.models.parameters import InductionMotorParameters, illustrative_4kw_400v_50hz_4pole
 from imcm.models.stator_resistance import phase_resistances_abc, resistive_drop_qd
-from imcm.signals.park import CONVENTION_NAME, balanced_phase_voltages, qd0_to_abc
+from imcm.models.supply_voltage import supply_voltage_qd, supply_voltage_traces
+from imcm.signals.park import CONVENTION_NAME, qd0_to_abc
 
 STATE_NAMES = ("lambda_qs", "lambda_ds", "lambda_qr", "lambda_dr", "omega_m")
 
@@ -90,8 +91,7 @@ def healthy_state_derivative(
     """
     lam_qs, lam_ds, lam_qr, lam_dr, omega_m = x
     omega = scenario.supply.omega_e
-    v_qs = scenario.supply.phase_peak_v
-    v_ds = 0.0
+    v_qs, v_ds, _v_0 = supply_voltage_qd(t, scenario)
     omega_r = params.pole_pairs * omega_m
     i_qs, i_ds, i_qr, i_dr = currents_from_fluxes(
         lam_qs, lam_ds, lam_qr, lam_dr, params
@@ -134,11 +134,8 @@ def _reconstruct(
     i_dr = (params.l_s * lam_dr - params.l_m * lam_ds) / delta
     tau_e = 1.5 * (params.n_poles / 2.0) * (lam_ds * i_qs - lam_qs * i_ds)
     tau_l = np.full_like(t, scenario.load.torque_nm)
-    v_qs = np.full_like(t, scenario.supply.phase_peak_v)
-    v_ds = np.zeros_like(t)
-    v_0 = np.zeros_like(t)
     theta = scenario.supply.omega_e * t
-    v_abc = balanced_phase_voltages(t, scenario.supply.omega_e, scenario.supply.phase_peak_v)
+    v_abc, v_qs, v_ds, v_0 = supply_voltage_traces(t, scenario)
     i_qd0 = np.stack((i_qs, i_ds, np.zeros_like(i_qs)), axis=0)
     i_abc = qd0_to_abc(i_qd0, theta)
     return {
@@ -218,8 +215,14 @@ def simulate_healthy(
         raise RuntimeError("RK45 produced non-finite states (numerical instability)")
 
     rec = _reconstruct(sol.t, sol.y, params, scenario)
+    if scenario.stator_resistance.enabled:
+        run_label = scenario.stator_resistance.label
+    elif scenario.supply.voltage_unbalance.enabled:
+        run_label = scenario.supply.voltage_unbalance.label
+    else:
+        run_label = "healthy"
     metadata: dict[str, Any] = {
-        "label": "healthy" if not scenario.stator_resistance.enabled else scenario.stator_resistance.label,
+        "label": run_label,
         "provenance": "simulated",
         "parameter_name": params.name,
         "parameter_provenance": params.provenance,
@@ -245,6 +248,15 @@ def simulate_healthy(
             enabled=scenario.stator_resistance.enabled,
             multipliers_abc=scenario.stator_resistance.multipliers_abc,
         ),
+        "supply_voltage_case": scenario.supply.voltage_unbalance.label,
+        "supply_voltage_multipliers_abc": scenario.supply.voltage_unbalance.multipliers_abc,
+        "supply_phase_peak_abc_v": scenario.supply.phase_peak_abc_v,
+        "supply_unbalance": {
+            "enabled": scenario.supply.voltage_unbalance.enabled,
+            "label": scenario.supply.voltage_unbalance.label,
+            "multipliers_abc": scenario.supply.voltage_unbalance.multipliers_abc,
+        },
+        "supply_fault": scenario.supply.voltage_unbalance.enabled,
         "inverter": False,
         "faults": scenario.stator_resistance.enabled,
         "experimental_validation": False,

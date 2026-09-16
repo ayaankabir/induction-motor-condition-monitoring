@@ -56,3 +56,26 @@ def balanced_phase_voltages(t: np.ndarray | float, omega_e: float, phase_peak_v:
     vb = phase_peak_v * np.cos(omega_e * t - two_pi_3)
     vc = phase_peak_v * np.cos(omega_e * t + two_pi_3)
     return np.stack((va, vb, vc), axis=0)
+
+
+def unbalanced_phase_voltages(
+    t: np.ndarray | float,
+    omega_e: float,
+    phase_peak_v: float,
+    multipliers_abc: tuple[float, float, float],
+) -> np.ndarray:
+    """Per-phase-scaled sinusoids for a controlled supply-voltage unbalance.
+
+    Each phase keeps the locked 120-degree spacing but its peak is scaled by the
+    corresponding multiplier.  This is a supply-side confounder; the motor model
+    and Park convention are unchanged.  With ``(1, 1, 1)`` the result is
+    identical to :func:`balanced_phase_voltages`.
+    """
+    if len(multipliers_abc) != 3 or any(value <= 0.0 for value in multipliers_abc):
+        raise ValueError("voltage multipliers must be three positive values")
+    t = np.asarray(t, dtype=float)
+    two_pi_3 = 2.0 * np.pi / 3.0
+    va = multipliers_abc[0] * phase_peak_v * np.cos(omega_e * t)
+    vb = multipliers_abc[1] * phase_peak_v * np.cos(omega_e * t - two_pi_3)
+    vc = multipliers_abc[2] * phase_peak_v * np.cos(omega_e * t + two_pi_3)
+    return np.stack((va, vb, vc), axis=0)

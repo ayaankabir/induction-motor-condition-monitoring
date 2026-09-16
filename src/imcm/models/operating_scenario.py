@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from math import pi, sqrt
 from typing import Literal
 
@@ -33,6 +33,27 @@ class StatorResistanceConfig:
 
 
 @dataclass(frozen=True)
+class VoltageUnbalanceConfig:
+    """Per-phase supply-voltage multipliers for controlled simulations.
+
+    The disabled/default case is the approved balanced healthy supply.  Values
+    are multipliers of ``SupplyConfig.phase_peak_v`` rather than new machine
+    identification data.  This is a supply-side confounder, not a winding
+    fault and must never be labelled as stator damage.
+    """
+
+    enabled: bool = False
+    multipliers_abc: tuple[float, float, float] = (1.0, 1.0, 1.0)
+    label: str = "balanced"
+
+    def __post_init__(self) -> None:
+        if len(self.multipliers_abc) != 3 or any(
+            value <= 0.0 for value in self.multipliers_abc
+        ):
+            raise ValueError("voltage multipliers must be three positive values")
+
+
+@dataclass(frozen=True)
 class SupplyConfig:
     """Ideal grid-like voltages for the first healthy-plant milestone."""
 
@@ -40,6 +61,7 @@ class SupplyConfig:
     line_line_rms_v: float
     waveform: SupplyWaveform
     notes: str
+    voltage_unbalance: VoltageUnbalanceConfig = VoltageUnbalanceConfig()
 
     @property
     def omega_e(self) -> float:
@@ -49,6 +71,17 @@ class SupplyConfig:
     def phase_peak_v(self) -> float:
         """Peak phase-to-neutral voltage for a balanced star machine."""
         return self.line_line_rms_v * sqrt(2.0) / sqrt(3.0)
+
+    @property
+    def phase_peak_abc_v(self) -> tuple[float, float, float]:
+        """Per-phase peak voltages after any controlled supply unbalance."""
+        if not self.voltage_unbalance.enabled:
+            peak = self.phase_peak_v
+            return (peak, peak, peak)
+        return tuple(
+            self.phase_peak_v * factor
+            for factor in self.voltage_unbalance.multipliers_abc
+        )
 
 
 @dataclass(frozen=True)
@@ -154,5 +187,52 @@ def fault_02_increased_mechanical_load_scenario() -> OperatingScenario:
         notes=(
             "Controlled operating-condition change, not a confirmed internal "
             "motor fault; simulation-only."
+        ),
+    )
+
+
+def fault_03_supply_voltage_unbalance_scenario(
+    multipliers_abc: tuple[float, float, float] = (1.0, 1.0, 0.9),
+    *,
+    label: str | None = None,
+) -> OperatingScenario:
+    """Controlled Fault 03: unbalanced three-phase supply voltages.
+
+    Only the applied three-phase supply voltages change (per-phase multipliers of
+    the balanced phase peak).  Motor equations, motor parameters, stator
+    resistance, load torque, Park convention, and supply frequency match the
+    approved healthy baseline.  This is a supply-side confounder, not a winding
+    fault and not a confirmed internal motor fault.
+
+    The default (1.0, 1.0, 0.9) is a controlled 10% reduction in the phase-C
+    supply voltage.  A 5% case is available by passing (1.0, 1.0, 0.95).
+    """
+    healthy = first_milestone_scenario()
+    resolved_label = label or "fault_03_phase_c_minus_10pct"
+    return OperatingScenario(
+        name="fault_03_supply_voltage_unbalance",
+        supply=replace(
+            healthy.supply,
+            notes=(
+                "Controlled unbalanced supply: per-phase voltage multipliers "
+                f"{multipliers_abc} on the same 50 Hz balanced-sinusoid model. "
+                "Supply-side confounder, not a winding fault."
+            ),
+            voltage_unbalance=VoltageUnbalanceConfig(
+                enabled=True,
+                multipliers_abc=multipliers_abc,
+                label=resolved_label,
+            ),
+        ),
+        load=healthy.load,
+        park_convention=healthy.park_convention,
+        stator_resistance=StatorResistanceConfig(
+            enabled=False,
+            multipliers_abc=(1.0, 1.0, 1.0),
+            label="healthy_balanced",
+        ),
+        notes=(
+            "Controlled supply voltage unbalance (confounder). Simulation-only; "
+            "not a confirmed internal motor fault and not winding damage."
         ),
     )

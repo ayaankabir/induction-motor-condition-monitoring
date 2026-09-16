@@ -7,6 +7,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from imcm.models.fifth_order_dq import HealthySimulationResult
+from imcm.models.supply_voltage import voltage_unbalance_factor_pct
 
 LATE_WINDOW_START_S = 0.8
 LATE_WINDOW_STOP_S = 1.0
@@ -18,6 +19,7 @@ CONVERGENCE_TOLERANCES = {
     "torque_ripple_nm": 1.0e-6,
     "final_speed_difference_rpm": 1.0e-5,
     "final_slip_difference": 1.0e-8,
+    "voltage_unbalance_pct": 1.0e-6,
 }
 
 
@@ -124,4 +126,75 @@ def compare_stator_resistance_cases(
         torque_ripple_fault_nm=torque_ripple_rms(fault, t_start=t_start, t_stop=t_stop),
         final_speed_difference_rpm=float(fault.speed_rpm[-1] - healthy.speed_rpm[-1]),
         final_slip_difference=float(fault.slip[-1] - healthy.slip[-1]),
+    )
+
+
+def supply_voltage_unbalance_pct(
+    result: HealthySimulationResult,
+    *,
+    t_start: float = LATE_WINDOW_START_S,
+    t_stop: float = LATE_WINDOW_STOP_S,
+) -> float:
+    """Return ``|V2| / |V1| * 100`` for the applied supply over the late window."""
+    mask = _window(result, t_start, t_stop)
+    return voltage_unbalance_factor_pct(
+        result.t[mask], result.v_abc[:, mask], result.scenario.supply.omega_e
+    )
+
+
+@dataclass(frozen=True)
+class SupplyUnbalanceComparisonMetrics:
+    """Matched healthy/fault-03 metrics for a controlled supply-voltage unbalance."""
+
+    phase_current_rms_healthy_a: tuple[float, float, float]
+    phase_current_rms_unbalance_a: tuple[float, float, float]
+    current_unbalance_healthy_pct: float
+    current_unbalance_unbalance_pct: float
+    negative_sequence_healthy_a: float
+    negative_sequence_unbalance_a: float
+    negative_sequence_healthy_pct: float
+    negative_sequence_unbalance_pct: float
+    supply_voltage_unbalance_healthy_pct: float
+    supply_voltage_unbalance_unbalance_pct: float
+    torque_ripple_healthy_nm: float
+    torque_ripple_unbalance_nm: float
+    final_speed_difference_rpm: float
+    final_slip_difference: float
+
+
+def compare_supply_unbalance_cases(
+    healthy: HealthySimulationResult,
+    unbalance: HealthySimulationResult,
+    *,
+    t_start: float = LATE_WINDOW_START_S,
+    t_stop: float = LATE_WINDOW_STOP_S,
+) -> SupplyUnbalanceComparisonMetrics:
+    """Compare matched time grids; simulation evidence, not a winding diagnosis."""
+    if not np.array_equal(healthy.t, unbalance.t):
+        raise ValueError("healthy and unbalance cases must share the same output time grid")
+    h_rms = phase_current_rms(healthy, t_start=t_start, t_stop=t_stop)
+    u_rms = phase_current_rms(unbalance, t_start=t_start, t_stop=t_stop)
+    h_i2, h_i2_pct = negative_sequence_current(healthy, t_start=t_start, t_stop=t_stop)
+    u_i2, u_i2_pct = negative_sequence_current(unbalance, t_start=t_start, t_stop=t_stop)
+    return SupplyUnbalanceComparisonMetrics(
+        phase_current_rms_healthy_a=h_rms,
+        phase_current_rms_unbalance_a=u_rms,
+        current_unbalance_healthy_pct=current_unbalance_pct(h_rms),
+        current_unbalance_unbalance_pct=current_unbalance_pct(u_rms),
+        negative_sequence_healthy_a=h_i2,
+        negative_sequence_unbalance_a=u_i2,
+        negative_sequence_healthy_pct=h_i2_pct,
+        negative_sequence_unbalance_pct=u_i2_pct,
+        supply_voltage_unbalance_healthy_pct=supply_voltage_unbalance_pct(
+            healthy, t_start=t_start, t_stop=t_stop
+        ),
+        supply_voltage_unbalance_unbalance_pct=supply_voltage_unbalance_pct(
+            unbalance, t_start=t_start, t_stop=t_stop
+        ),
+        torque_ripple_healthy_nm=torque_ripple_rms(healthy, t_start=t_start, t_stop=t_stop),
+        torque_ripple_unbalance_nm=torque_ripple_rms(
+            unbalance, t_start=t_start, t_stop=t_stop
+        ),
+        final_speed_difference_rpm=float(unbalance.speed_rpm[-1] - healthy.speed_rpm[-1]),
+        final_slip_difference=float(unbalance.slip[-1] - healthy.slip[-1]),
     )
