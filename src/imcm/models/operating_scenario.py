@@ -116,6 +116,40 @@ class BearingFaultConfig:
 
 
 @dataclass(frozen=True)
+class RotorAsymmetryConfig:
+    """Rotor electrical asymmetry proxy for broken-bar-related signatures.
+
+    The single stator-referred cage resistance ``R_r`` is split between two
+    orthogonal rotor-frame axes, ``R_r (1 + severity)`` and
+    ``R_r (1 - severity)``.  In the locked synchronous frame this appears as a
+    rotor resistance modulated at twice the slip angle (see
+    ``imcm.faults.rotor_asymmetry`` for the equations).  This is a
+    **simulation-only proxy** for broken-bar-related behaviour: it is not a
+    bar-resolved cage model, it is not calibrated to a number of broken bars,
+    and nothing here is experimentally validated or a real-machine diagnosis.
+
+    ``reference_slip`` optionally pins the constant slip used to advance the
+    modulation phase; when ``None`` it is solved from the healthy
+    T-equivalent-circuit torque balance at the scenario load.  The mean rotor
+    resistance stays exactly ``R_r``, so the proxy isolates the asymmetry
+    effect and does not model the small mean-resistance shift a real broken
+    bar also produces.
+    """
+
+    enabled: bool = False
+    severity: float = 0.0
+    initial_phase_deg: float = 0.0
+    reference_slip: float | None = None
+    label: str = "healthy_rotor"
+
+    def __post_init__(self) -> None:
+        if not 0.0 <= self.severity < 1.0:
+            raise ValueError("severity must lie in [0, 1)")
+        if self.reference_slip is not None and not 0.0 < self.reference_slip < 1.0:
+            raise ValueError("reference_slip must lie in (0, 1) when provided")
+
+
+@dataclass(frozen=True)
 class SupplyConfig:
     """Ideal grid-like voltages for the first healthy-plant milestone."""
 
@@ -164,6 +198,7 @@ class OperatingScenario:
     notes: str
     stator_resistance: StatorResistanceConfig = StatorResistanceConfig()
     bearing_fault: BearingFaultConfig = BearingFaultConfig()
+    rotor_asymmetry: RotorAsymmetryConfig = RotorAsymmetryConfig()
 
 
 def first_milestone_scenario() -> OperatingScenario:
@@ -291,6 +326,49 @@ def fault_04_bearing_outer_race_scenario(
             "Controlled simulated bearing outer-race fault expressed through a "
             "vibration channel at BPFO. Electrical motor model unchanged; "
             "simulation-only; not a confirmed real-machine diagnosis."
+        ),
+    )
+
+
+def fault_05_rotor_asymmetry_scenario(
+    *,
+    severity: float = 0.10,
+    label: str | None = None,
+) -> OperatingScenario:
+    """Controlled Fault 05: rotor electrical asymmetry (broken-bar proxy).
+
+    Supply, load, motor parameters, stator resistance, and Park convention
+    match the approved healthy baseline; only the rotor resistance
+    representation changes, as a documented **simulation-only proxy**: a
+    rotor-frame axis resistance split ``R_r (1 +/- severity)`` whose
+    synchronous-frame modulation advances at twice the reference slip angle.
+    This is not a physically complete broken rotor bar model, is not
+    bar-resolved, and is not severity-calibrated; no experimental validation
+    or real-machine diagnosis is claimed.
+    """
+    healthy = first_milestone_scenario()
+    resolved_label = label or (
+        f"fault_05_rotor_asymmetry_severity_{round(severity * 100)}pct"
+    )
+    return OperatingScenario(
+        name="fault_05_rotor_electrical_asymmetry",
+        supply=healthy.supply,
+        load=healthy.load,
+        park_convention=healthy.park_convention,
+        stator_resistance=StatorResistanceConfig(
+            enabled=False,
+            multipliers_abc=(1.0, 1.0, 1.0),
+            label="healthy_balanced",
+        ),
+        rotor_asymmetry=RotorAsymmetryConfig(
+            enabled=True,
+            severity=severity,
+            label=resolved_label,
+        ),
+        notes=(
+            "Controlled simulated rotor electrical asymmetry proxy for "
+            "broken-bar-related behaviour. Simulation-only; not a physically "
+            "complete broken rotor bar model; not experimentally validated."
         ),
     )
 

@@ -37,9 +37,19 @@ PLANNED_FAULTS: tuple[PlannedFault, ...] = (
     ),
     PlannedFault(
         id="rotor_asymmetry_proxy",
-        name="Rotor electrical asymmetry (broken-bar proxy)",
-        mechanism="Unequal R_qr, R_dr or 2*omega_r resistance modulation on the two-axis cage.",
-        honesty_note="May produce sidebands near f_s(1±2s). It is not a bar-resolved cage model.",
+        name="Rotor electrical asymmetry (broken-bar proxy) — Fault 05 implemented",
+        mechanism=(
+            "Rotor-frame axis resistance split R_r(1 +/- severity) on the "
+            "two-axis cage, projected into the synchronous frame where it "
+            "modulates at 2*s*f_s, producing stator-current components near "
+            "f_s(1 -/+ 2s). Mean rotor resistance is preserved."
+        ),
+        honesty_note=(
+            "Simulation-only proxy for broken-bar-related behaviour; may "
+            "produce sidebands near f_s(1±2s). Not a physically complete or "
+            "bar-resolved electromagnetic model, not severity-calibrated, not "
+            "experimentally validated, and not a real-machine diagnosis."
+        ),
         phase=5,
     ),
     PlannedFault(

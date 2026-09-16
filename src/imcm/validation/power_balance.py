@@ -13,6 +13,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from imcm.models.fifth_order_dq import HealthySimulationResult
+from imcm.models.rotor_asymmetry import modulation_phase_rad, rotor_copper_loss_w
 from imcm.models.stator_resistance import phase_resistances_abc, resistance_matrix_qd
 
 
@@ -58,7 +59,17 @@ def instantaneous_powers(result: HealthySimulationResult) -> dict[str, np.ndarra
             dtype=float,
             count=result.t.size,
         )
-    p_cu = p_cu_stator + 1.5 * result.params.r_r * (result.i_qr**2 + result.i_dr**2)
+    rotor = result.scenario.rotor_asymmetry
+    if rotor.enabled and rotor.severity != 0.0:
+        # Fault 05 proxy: rotor-frame axis resistance split.  The healthy
+        # scalar path below is preserved exactly for disabled/zero severity.
+        two_phi = modulation_phase_rad(result.t, rotor, result.scenario.supply.omega_e)
+        p_cu_rotor = rotor_copper_loss_w(
+            result.i_qr, result.i_dr, two_phi, rotor.severity, result.params.r_r
+        )
+    else:
+        p_cu_rotor = 1.5 * result.params.r_r * (result.i_qr**2 + result.i_dr**2)
+    p_cu = p_cu_stator + p_cu_rotor
     p_mech = result.tau_e * result.omega_m
     w_mag = magnetic_energy(result)
     p_mag = np.gradient(w_mag, result.t)

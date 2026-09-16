@@ -31,7 +31,7 @@ A modular Python workspace to:
 | Parameters | Illustrative **4 kW, 400 V, 50 Hz, 4-pole** literature example — **not measured** |
 | Integrator | Adaptive **RK45**, `max_step = 10^{-4}\,\mathrm{s}` |
 | Initial condition | **Start from rest** (zero flux, \(\omega_m=0\)), direct-on-line voltage |
-| Broken rotor bar | **Not implemented.** Future work may use a labeled proxy or coupled circuits |
+| Broken rotor bar | **No bar-resolved model.** A documented **simulation-only proxy** (Fault 05, rotor electrical asymmetry) exists; see [`docs/fault_05_rotor_asymmetry.md`](docs/fault_05_rotor_asymmetry.md) |
 | Scope | Simulation-only |
 
 Full equations, identities, tests, and limitations: [`docs/modeling-plan.md`](docs/modeling-plan.md).
@@ -73,7 +73,7 @@ supply v_abc(t)          T_L = constant
 | `imcm.signals` | Krause \(abc\leftrightarrow qd0\) |
 | `imcm.validation` | Power balance and equivalent-circuit checks |
 | `imcm.reporting` | Static start-up figures (not a dashboard) |
-| `imcm.faults` | Planned identifiers only; **no fault physics** |
+| `imcm.faults` | Fault catalog and the Fault 04 vibration-channel generator; Fault 05 proxy physics lives in `imcm.models.rotor_asymmetry` |
 | `imcm.processing` | Spectra (later) |
 
 ## Modeling approach (short)
@@ -122,7 +122,7 @@ Do not look in `data/` for measurements; there are none.
 | **2 — Numerical hygiene** | Step size, power balance, transform tests on simulated traces | Tests fail if energy or frames break |
 | **3 — Voltage unbalance** | Confounder; same healthy ODEs | Negative-sequence current; labeled **supply**, not winding damage |
 | **4 — Stator \(R\) unbalance** | Unequal phase resistances | High-resistance connection, **not** turn fault |
-| **5 — Rotor asymmetry (optional)** | Documented proxy **or** reduced coupled-circuit | Sidebands near \(f_s(1\pm 2s)\) if proxy; **never** “bar count” |
+| **5 — Rotor asymmetry** | **Done as a documented simulation-only proxy** (Fault 05): rotor-frame axis resistance split \(R_r(1\pm\delta)\), synchronous-frame modulation at \(2sf_s\). Not bar-resolved, not severity-calibrated. A reduced coupled-circuit cage stays optional later work | Sidebands near \(f_s(1\pm 2s)\) on simulated traces; **never** “bar count” |
 | **6 — MCSA pipeline** | Windowed spectra, slip-aware bins | Features from simulated traces + metadata only |
 | **7 — Optional** | Public dataset or lab plan **if** they exist | Never invent traces |
 | **8 — Optional** | Report UI | Visualization of **already computed** results |

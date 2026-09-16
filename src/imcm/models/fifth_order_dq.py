@@ -6,7 +6,7 @@ digital twin and not experimental data.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 import numpy as np
@@ -18,6 +18,11 @@ from imcm.models.flux_map import (
 )
 from imcm.models.operating_scenario import OperatingScenario, first_milestone_scenario
 from imcm.models.parameters import InductionMotorParameters, illustrative_4kw_400v_50hz_4pole
+from imcm.models.rotor_asymmetry import (
+    modulation_phase_rad,
+    reference_slip_for_load,
+    rotor_asymmetry_drops,
+)
 from imcm.models.stator_resistance import phase_resistances_abc, resistive_drop_qd
 from imcm.models.supply_voltage import supply_voltage_qd, supply_voltage_traces
 from imcm.signals.park import CONVENTION_NAME, qd0_to_abc
@@ -108,8 +113,20 @@ def healthy_state_derivative(
         v_rqs, v_rds = resistive_drop_qd(i_qs, i_ds, omega * t, r_abc)
     p_lam_qs = v_qs - v_rqs - omega * lam_ds
     p_lam_ds = v_ds - v_rds + omega * lam_qs
-    p_lam_qr = -params.r_r * i_qr - (omega - omega_r) * lam_dr
-    p_lam_dr = -params.r_r * i_dr + (omega - omega_r) * lam_qr
+    rotor = scenario.rotor_asymmetry
+    if rotor.enabled and rotor.severity != 0.0:
+        # Fault 05 proxy: rotor-frame axis resistance split R_r(1 +/- severity),
+        # projected into the synchronous frame at twice the reference slip
+        # angle.  Simulation-only; see imcm.models.rotor_asymmetry.  The
+        # disabled and severity==0 paths keep the healthy scalar row below.
+        two_phi = modulation_phase_rad(t, rotor, omega)
+        drop_qr, drop_dr = rotor_asymmetry_drops(
+            i_qr, i_dr, two_phi, rotor.severity, params.r_r
+        )
+    else:
+        drop_qr, drop_dr = params.r_r * i_qr, params.r_r * i_dr
+    p_lam_qr = -drop_qr - (omega - omega_r) * lam_dr
+    p_lam_dr = -drop_dr + (omega - omega_r) * lam_qr
     tau_e = electromagnetic_torque_flux_current(
         lam_qs, lam_ds, i_qs, i_ds, params.n_poles
     )
@@ -178,6 +195,14 @@ def simulate_healthy(
         params = illustrative_4kw_400v_50hz_4pole()
     if scenario is None:
         scenario = first_milestone_scenario()
+    rotor = scenario.rotor_asymmetry
+    if rotor.enabled and rotor.reference_slip is None:
+        # Resolve the constant reference slip once (documented Fault 05 proxy
+        # approximation: the fifth-order state has no slip-angle state).
+        rotor = replace(
+            rotor, reference_slip=reference_slip_for_load(params, scenario)
+        )
+        scenario = replace(scenario, rotor_asymmetry=rotor)
     if scenario.park_convention != CONVENTION_NAME:
         raise ValueError(
             f"Scenario Park convention {scenario.park_convention!r} does not match "
@@ -215,7 +240,9 @@ def simulate_healthy(
         raise RuntimeError("RK45 produced non-finite states (numerical instability)")
 
     rec = _reconstruct(sol.t, sol.y, params, scenario)
-    if scenario.stator_resistance.enabled:
+    if scenario.rotor_asymmetry.enabled:
+        run_label = scenario.rotor_asymmetry.label
+    elif scenario.stator_resistance.enabled:
         run_label = scenario.stator_resistance.label
     elif scenario.supply.voltage_unbalance.enabled:
         run_label = scenario.supply.voltage_unbalance.label
@@ -258,7 +285,11 @@ def simulate_healthy(
         },
         "supply_fault": scenario.supply.voltage_unbalance.enabled,
         "inverter": False,
-        "faults": scenario.stator_resistance.enabled,
+        "faults": scenario.stator_resistance.enabled or scenario.rotor_asymmetry.enabled,
+        "rotor_asymmetry_case": scenario.rotor_asymmetry.label,
+        "rotor_asymmetry_enabled": scenario.rotor_asymmetry.enabled,
+        "rotor_asymmetry_severity": scenario.rotor_asymmetry.severity,
+        "rotor_asymmetry_reference_slip": scenario.rotor_asymmetry.reference_slip,
         "bearing_fault_case": scenario.bearing_fault.label,
         "bearing_fault_enabled": scenario.bearing_fault.enabled,
         "bearing_fault_channel": "simulated_vibration_m_s2",
