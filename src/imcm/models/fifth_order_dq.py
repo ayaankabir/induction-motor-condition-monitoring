@@ -259,6 +259,9 @@ def simulate_healthy(
         "supply_fault": scenario.supply.voltage_unbalance.enabled,
         "inverter": False,
         "faults": scenario.stator_resistance.enabled,
+        "bearing_fault_case": scenario.bearing_fault.label,
+        "bearing_fault_enabled": scenario.bearing_fault.enabled,
+        "bearing_fault_channel": "simulated_vibration_m_s2",
         "experimental_validation": False,
     }
     return HealthySimulationResult(

@@ -1,1 +1,1 @@
-"""Electrical signal processing (planned after a verified healthy plant)."""
+"""Signal processing for simulated traces (spectra, envelope analysis)."""

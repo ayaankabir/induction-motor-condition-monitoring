@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from math import pi, sqrt
+from math import cos, pi, radians, sqrt
 from typing import Literal
 
 ParkConvention = Literal["krause_classical_2_3"]
@@ -54,6 +54,68 @@ class VoltageUnbalanceConfig:
 
 
 @dataclass(frozen=True)
+class BearingFaultConfig:
+    """Simulated rolling-element bearing outer-race fault (vibration channel).
+
+    Enabling this does **not** change the motor ODEs, supply, load, stator
+    resistance, or Park convention.  It configures a separate simulated
+    vibration-sensor channel carrying an impulse train at the BPFO
+    characteristic frequency (see ``imcm.faults.bearing``).  Bearing geometry
+    values are published literature-example dimensions of a 6205-series
+    deep-groove ball bearing, **not** a measured bearing in this project, and
+    the result is a simulated condition-monitoring signature, not a confirmed
+    real-machine diagnosis.
+    """
+
+    enabled: bool = False
+    nb_balls: int = 9
+    ball_diameter_m: float = 7.94e-3
+    pitch_diameter_m: float = 39.04e-3
+    contact_angle_deg: float = 0.0
+    resonance_hz: float = 2000.0
+    resonance_decay_s: float = 1.0e-3
+    amplitude_m_s2: float = 1.0
+    label: str = "healthy_bearing"
+
+    def __post_init__(self) -> None:
+        if self.nb_balls < 1:
+            raise ValueError("nb_balls must be a positive integer")
+        if self.ball_diameter_m <= 0.0 or self.pitch_diameter_m <= 0.0:
+            raise ValueError("bearing diameters must be positive")
+        if self.pitch_diameter_m <= self.ball_diameter_m:
+            raise ValueError("pitch diameter must exceed the ball diameter")
+        if not -90.0 <= self.contact_angle_deg <= 90.0:
+            raise ValueError("contact angle must lie in [-90, 90] degrees")
+        if self.resonance_hz <= 0.0 or self.resonance_decay_s <= 0.0:
+            raise ValueError("resonance frequency and decay time must be positive")
+        if self.amplitude_m_s2 < 0.0:
+            raise ValueError("amplitude_m_s2 must be non-negative")
+
+    @property
+    def ball_pitch_ratio(self) -> float:
+        """``Bd / Pd`` appearing in the bearing characteristic frequencies."""
+        return self.ball_diameter_m / self.pitch_diameter_m
+
+    def bpfo_hz(self, shaft_hz: float) -> float:
+        """Ball-pass frequency, outer race: ``(Nb/2) f_r (1 - (Bd/Pd) cos(phi))``."""
+        return (
+            0.5
+            * self.nb_balls
+            * shaft_hz
+            * (1.0 - self.ball_pitch_ratio * cos(radians(self.contact_angle_deg)))
+        )
+
+    def bpfi_hz(self, shaft_hz: float) -> float:
+        """Ball-pass frequency, inner race: ``(Nb/2) f_r (1 + (Bd/Pd) cos(phi))``."""
+        return (
+            0.5
+            * self.nb_balls
+            * shaft_hz
+            * (1.0 + self.ball_pitch_ratio * cos(radians(self.contact_angle_deg)))
+        )
+
+
+@dataclass(frozen=True)
 class SupplyConfig:
     """Ideal grid-like voltages for the first healthy-plant milestone."""
 
@@ -101,6 +163,7 @@ class OperatingScenario:
     park_convention: ParkConvention
     notes: str
     stator_resistance: StatorResistanceConfig = StatorResistanceConfig()
+    bearing_fault: BearingFaultConfig = BearingFaultConfig()
 
 
 def first_milestone_scenario() -> OperatingScenario:
@@ -187,6 +250,47 @@ def fault_02_increased_mechanical_load_scenario() -> OperatingScenario:
         notes=(
             "Controlled operating-condition change, not a confirmed internal "
             "motor fault; simulation-only."
+        ),
+    )
+
+
+def fault_04_bearing_outer_race_scenario(
+    *,
+    severity_scale: float = 1.0,
+) -> OperatingScenario:
+    """Controlled Fault 04: rolling-element bearing outer-race defect.
+
+    The motor ODEs, supply, load, motor parameters, stator resistance, and
+    Park convention are **identical** to the approved healthy baseline; the
+    electrical traces are therefore bit-for-bit healthy.  The fault exists as
+    a separate **simulated vibration channel** configured here and generated
+    by ``imcm.faults.bearing`` at the BPFO characteristic frequency.  Bearing
+    geometry is a published 6205-series literature example, not a measured
+    bearing, and the output is a simulated condition-monitoring signature,
+    not a confirmed real-machine diagnosis.
+    """
+    healthy = first_milestone_scenario()
+    if severity_scale <= 0.0:
+        raise ValueError("severity_scale must be positive")
+    return OperatingScenario(
+        name="fault_04_bearing_outer_race_bpfo",
+        supply=healthy.supply,
+        load=healthy.load,
+        park_convention=healthy.park_convention,
+        stator_resistance=StatorResistanceConfig(
+            enabled=False,
+            multipliers_abc=(1.0, 1.0, 1.0),
+            label="healthy_balanced",
+        ),
+        bearing_fault=BearingFaultConfig(
+            enabled=True,
+            amplitude_m_s2=severity_scale,
+            label="fault_04_outer_race_bpfo",
+        ),
+        notes=(
+            "Controlled simulated bearing outer-race fault expressed through a "
+            "vibration channel at BPFO. Electrical motor model unchanged; "
+            "simulation-only; not a confirmed real-machine diagnosis."
         ),
     )
 

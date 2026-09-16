@@ -1,6 +1,7 @@
-"""Named fault cases planned for later phases.
+"""Named fault cases for the controlled fault studies.
 
-These identifiers are documentation, not simulated defects.
+Implemented entries carry a simulated, documented representation; the honesty
+note states what each representation can and cannot claim.
 """
 
 from __future__ import annotations
@@ -40,5 +41,19 @@ PLANNED_FAULTS: tuple[PlannedFault, ...] = (
         mechanism="Unequal R_qr, R_dr or 2*omega_r resistance modulation on the two-axis cage.",
         honesty_note="May produce sidebands near f_s(1±2s). It is not a bar-resolved cage model.",
         phase=5,
+    ),
+    PlannedFault(
+        id="bearing_outer_race_bpfo",
+        name="Bearing outer-race fault (BPFO vibration signature)",
+        mechanism=(
+            "Simulated vibration channel with an impulse train at "
+            "BPFO = (Nb/2) f_r (1 - (Bd/Pd) cos(phi)); motor ODEs unchanged."
+        ),
+        honesty_note=(
+            "Simulated condition-monitoring signature on a literature-example "
+            "bearing geometry. Not a measured bearing, not a stator-current "
+            "signature, and not a confirmed real-machine diagnosis."
+        ),
+        phase=6,
     ),
 )
