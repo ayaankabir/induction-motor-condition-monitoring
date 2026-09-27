@@ -3,6 +3,10 @@
 Student engineering project. **Simulation-first, not a digital twin.**
 No experimental measurements exist in this repository.
 
+## Project Structure
+
+This repository is the Python/backend side of the project, containing the induction-motor simulation, signal analysis, diagnostics, API, tests, and engineering reporting. The current portfolio-facing dashboard is maintained in a separate Next.js frontend repository.
+
 ## What this project is
 
 A modular Python workspace to:
@@ -126,6 +130,8 @@ This generates:
 - `imcm_engineering_report_manifest.json`
 
 ## Interactive Dashboard & API
+
+`dashboard/app.py` is the original read-only Streamlit dashboard for development. The current portfolio UI is the separate Next.js frontend maintained in [motor-simulation-data-comparison](https://github.com/ayaankabir/motor-simulation-data-comparison).
 
 ```bash
 # Launch read-only Streamlit dashboard
