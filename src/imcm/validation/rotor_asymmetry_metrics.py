@@ -27,6 +27,10 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from imcm.analysis.spectral_analysis import (
+    compute_amplitude_spectrum,
+    find_peak_amplitude,
+)
 from imcm.models.fifth_order_dq import HealthySimulationResult
 from imcm.validation.fault_metrics import LATE_WINDOW_START_S, torque_ripple_rms
 
@@ -72,13 +76,8 @@ def spectrum_peak_amplitude(
         0.0 < center_hz - half_width_hz and center_hz + half_width_hz < 0.5 * fs_hz
     ):
         raise ValueError("search band must lie strictly inside (0, Nyquist)")
-    window = np.hanning(x.size)
-    amplitude = 2.0 * np.abs(np.fft.rfft((x - np.mean(x)) * window)) / np.sum(window)
-    freq = np.fft.rfftfreq(x.size, d=dt)
-    band = (freq >= center_hz - half_width_hz) & (freq <= center_hz + half_width_hz)
-    if not np.any(band):
-        raise ValueError("no spectrum bins inside the requested band")
-    return float(np.max(amplitude[band]))
+    spec = compute_amplitude_spectrum(x, fs_hz, remove_mean=True)
+    return find_peak_amplitude(spec.freq_hz, spec.amplitude, center_hz, half_width_hz)
 
 
 @dataclass(frozen=True)

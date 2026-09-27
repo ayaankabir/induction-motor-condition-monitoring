@@ -4,6 +4,9 @@ venv/
 env/
 .env/
 
+# Local agent configs & skills (workspace tooling)
+.agents/
+
 # Python bytecode and packaging
 __pycache__/
 *.py[cod]
@@ -37,3 +40,12 @@ results/*.csv
 results/*.npz
 results/*.json
 !results/.gitkeep
+!results/healthy_startup_summary.json
+!results/fault_01_stator_resistance_imbalance_summary.json
+!results/fault_02_increased_mechanical_load_summary.json
+!results/fault_03_supply_voltage_unbalance_summary.json
+!results/fault_04_bearing_outer_race_summary.json
+!results/fault_05_rotor_asymmetry_summary.json
+!results/fault_overview_summary.json
+!results/healthy_startup_provenance.json
+!results/fault_01_stator_resistance_imbalance_provenance.json

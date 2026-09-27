@@ -1,0 +1,154 @@
+{
+  "label": "simulated_fault_05_rotor_asymmetry_proxy_comparison",
+  "condition_kind": "rotor_electrical_asymmetry_proxy_not_complete_broken_bar_model",
+  "parameter_provenance": "literature_example",
+  "healthy_metadata": {
+    "label": "healthy",
+    "provenance": "simulated",
+    "parameter_name": "illustrative_4kW_400V_50Hz_4pole",
+    "parameter_provenance": "literature_example",
+    "scenario_name": "healthy_50hz_constant_torque",
+    "park_convention": "krause_classical_2_3",
+    "solver": "RK45",
+    "max_step_s": 0.0001,
+    "rtol": 1e-06,
+    "atol": 1e-08,
+    "t_end_s": 3.0,
+    "output_dt_s": 0.0001,
+    "initial_condition": "rest",
+    "nfev": 180002,
+    "njev": 0,
+    "n_eval": 30001,
+    "message": "The solver successfully reached the end of the integration interval.",
+    "supply_frequency_hz": 50.0,
+    "load_type": "constant_torque",
+    "load_torque_nm": 15.0,
+    "stator_resistance_case": "healthy_balanced",
+    "stator_resistances_abc_ohm": [
+      1.405,
+      1.405,
+      1.405
+    ],
+    "supply_voltage_case": "balanced",
+    "supply_voltage_multipliers_abc": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "supply_phase_peak_abc_v": [
+      326.59863237109045,
+      326.59863237109045,
+      326.59863237109045
+    ],
+    "supply_unbalance": {
+      "enabled": false,
+      "label": "balanced",
+      "multipliers_abc": [
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "supply_fault": false,
+    "inverter": false,
+    "faults": false,
+    "rotor_asymmetry_case": "healthy_rotor",
+    "rotor_asymmetry_enabled": false,
+    "rotor_asymmetry_severity": 0.0,
+    "rotor_asymmetry_reference_slip": null,
+    "bearing_fault_case": "healthy_bearing",
+    "bearing_fault_enabled": false,
+    "bearing_fault_channel": "simulated_vibration_m_s2",
+    "experimental_validation": false
+  },
+  "fault_metadata": {
+    "label": "fault_05_rotor_asymmetry_severity_10pct",
+    "provenance": "simulated",
+    "parameter_name": "illustrative_4kW_400V_50Hz_4pole",
+    "parameter_provenance": "literature_example",
+    "scenario_name": "fault_05_rotor_electrical_asymmetry",
+    "park_convention": "krause_classical_2_3",
+    "solver": "RK45",
+    "max_step_s": 0.0001,
+    "rtol": 1e-06,
+    "atol": 1e-08,
+    "t_end_s": 3.0,
+    "output_dt_s": 0.0001,
+    "initial_condition": "rest",
+    "nfev": 180002,
+    "njev": 0,
+    "n_eval": 30001,
+    "message": "The solver successfully reached the end of the integration interval.",
+    "supply_frequency_hz": 50.0,
+    "load_type": "constant_torque",
+    "load_torque_nm": 15.0,
+    "stator_resistance_case": "healthy_balanced",
+    "stator_resistances_abc_ohm": [
+      1.405,
+      1.405,
+      1.405
+    ],
+    "supply_voltage_case": "balanced",
+    "supply_voltage_multipliers_abc": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "supply_phase_peak_abc_v": [
+      326.59863237109045,
+      326.59863237109045,
+      326.59863237109045
+    ],
+    "supply_unbalance": {
+      "enabled": false,
+      "label": "balanced",
+      "multipliers_abc": [
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "supply_fault": false,
+    "inverter": false,
+    "faults": true,
+    "rotor_asymmetry_case": "fault_05_rotor_asymmetry_severity_10pct",
+    "rotor_asymmetry_enabled": true,
+    "rotor_asymmetry_severity": 0.1,
+    "rotor_asymmetry_reference_slip": 0.02375569785177748,
+    "bearing_fault_case": "healthy_bearing",
+    "bearing_fault_enabled": false,
+    "bearing_fault_channel": "simulated_vibration_m_s2",
+    "experimental_validation": false
+  },
+  "rotor_asymmetry_config": {
+    "enabled": true,
+    "severity": 0.1,
+    "initial_phase_deg": 0.0,
+    "reference_slip": 0.02375569785177748,
+    "label": "fault_05_rotor_asymmetry_severity_10pct"
+  },
+  "metrics": {
+    "severity": 0.1,
+    "reference_slip": 0.02375569785177748,
+    "fundamental_hz": 50.0,
+    "modulation_frequency_hz": 2.375569785177748,
+    "lower_sideband_hz": 47.624430214822254,
+    "upper_sideband_hz": 52.375569785177746,
+    "sideband_half_width_hz": 1.0,
+    "phase_a_fundamental_healthy_a": 7.870621735687073,
+    "phase_a_fundamental_fault_a": 7.867991531036202,
+    "lower_sideband_healthy_a": 0.00026243794301020727,
+    "lower_sideband_fault_a": 0.22434282798247293,
+    "upper_sideband_healthy_a": 0.0002624388896393345,
+    "upper_sideband_fault_a": 0.22822713346772913,
+    "sync_modulation_healthy_a": 5.923360737076678e-20,
+    "sync_modulation_fault_a": 0.45235385768987946,
+    "torque_ripple_healthy_nm": 3.552713678800501e-15,
+    "torque_ripple_fault_nm": 0.054427608678924454,
+    "final_speed_difference_rpm": -2.5289319376672665,
+    "final_slip_difference": 0.0016859546251113862
+  },
+  "healthy_power_balance_residual_rel": 3.909763560044807e-15,
+  "fault_power_balance_residual_rel": 4.074916269441717e-13,
+  "note": "Simulated rotor electrical asymmetry proxy for broken-bar-related behaviour. Not a physically complete or bar-resolved broken-bar model; not severity-calibrated; simulation-only; no experimental validation and no real-machine diagnosis."
+}

@@ -8,6 +8,8 @@ resistance are unchanged from the healthy baseline.
 
 from __future__ import annotations
 
+from dataclasses import asdict
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -29,7 +31,18 @@ from imcm.models.operating_scenario import (
     fault_02_increased_mechanical_load_scenario,
     first_milestone_scenario,
 )
+from imcm.reporting.provenance import ProvenanceRecord
+from imcm.reporting.run_config import RunConfig, emit_run_artifacts
 from imcm.validation.power_balance import power_balance_window
+
+
+def _parameter_hash(params) -> str:
+    """Return a deterministic SHA-256 hash of the motor parameters."""
+    payload = asdict(params)
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode(
+        "utf-8"
+    )
+    return hashlib.sha256(canonical).hexdigest()
 
 
 def _late_mean(values: np.ndarray, t: np.ndarray, t_start: float = 0.8) -> float:
@@ -91,9 +104,8 @@ def main() -> None:
         healthy_slip=healthy.slip,
         condition_slip=condition.slip,
     )
-    (out / "fault_02_increased_mechanical_load_summary.json").write_text(
-        json.dumps(summary, indent=2), encoding="utf-8"
-    )
+    summary_path = out / "fault_02_increased_mechanical_load_summary.json"
+    summary_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
 
     fig, axes = plt.subplots(5, 1, figsize=(9, 12), sharex=False)
     for index, name in enumerate(("a", "b", "c")):
@@ -129,8 +141,78 @@ def main() -> None:
     figure = out / "fault_02_increased_mechanical_load_comparison.png"
     fig.savefig(figure, dpi=140)
     plt.close(fig)
+
+    manifest_path = out / "fault_02_increased_mechanical_load_provenance.json"
+    run_config_path = out / "fault_02_increased_mechanical_load_run_config.json"
+
+    output_paths = [
+        out / "fault_02_increased_mechanical_load.npz",
+        summary_path,
+        figure,
+    ]
+    output_rel = [str(path.relative_to(ROOT)) for path in output_paths]
+    output_rel.append(str(manifest_path.relative_to(ROOT)))
+
+    solver_settings = {
+        "method": "RK45",
+        "t_end": kwargs["t_end"],
+        "max_step": kwargs["max_step"],
+        "output_dt": kwargs["output_dt"],
+        "rtol": kwargs["rtol"],
+        "atol": kwargs["atol"],
+    }
+
+    provenance = ProvenanceRecord.create(
+        dataset_label="simulated",
+        parameter_hash=_parameter_hash(condition.params),
+        parameter_source=condition.params.provenance,
+        solver_settings=solver_settings,
+        initial_condition={
+            "description": (
+                "start from rest; matched healthy and Condition 02 "
+                "increased-mechanical-load simulations"
+            ),
+        },
+        output_files=output_rel,
+    )
+
+    run_config = RunConfig.create(
+        condition_id="fault_02",
+        condition_kind="operating_condition_change_not_internal_fault",
+        scenario_name=condition.scenario.name,
+        park_convention=condition.scenario.park_convention,
+        motor_parameters=asdict(condition.params),
+        solver_settings=solver_settings,
+        initial_condition={
+            "state": "rest",
+            "description": "start from rest; matched healthy and condition runs",
+        },
+        analysis_windows=[
+            {"name": "steady_state", "start_s": 0.8, "end_s": kwargs["t_end"]},
+        ],
+        condition_parameters={
+            "type": "increased_mechanical_load",
+            "load_type": condition.scenario.load.load_type,
+            "healthy_load_torque_nm": healthy.scenario.load.torque_nm,
+            "condition_load_torque_nm": condition.scenario.load.torque_nm,
+            "load_increase_percent": summary["load_increase_percent"],
+        },
+        outputs=output_rel,
+        provenance_manifest={"path": str(manifest_path.relative_to(ROOT))},
+    )
+
+    emit_run_artifacts(
+        run_config,
+        provenance,
+        run_config_path=run_config_path,
+        manifest_path=manifest_path,
+        root=ROOT,
+    )
+
     print(json.dumps(summary, indent=2))
-    print(f"Wrote {figure}")
+    print("Wrote:")
+    for path in [*output_paths, manifest_path, run_config_path]:
+        print(f"  {path}")
 
 
 if __name__ == "__main__":

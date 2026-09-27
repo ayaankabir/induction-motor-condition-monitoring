@@ -1,1 +1,1 @@
-"""Figure helpers. Not an interactive dashboard."""
+"""Engineering report generation, figure helpers, provenance, and run-configuration metadata."""

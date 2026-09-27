@@ -1,0 +1,292 @@
+{
+  "label": "simulated_fault_overview",
+  "generated_from": [
+    "fault_01_stator_resistance_imbalance_summary.json",
+    "fault_02_increased_mechanical_load_summary.json",
+    "fault_03_supply_voltage_unbalance_summary.json",
+    "fault_04_bearing_outer_race_summary.json",
+    "fault_05_rotor_asymmetry_summary.json"
+  ],
+  "provenance": {
+    "traces": "simulated",
+    "parameters": "literature_example",
+    "experimental_validation": false
+  },
+  "scope_note": "Presentation of controlled simulation studies only. No GUI, no ML classifier, no predictive-maintenance claim, no digital-twin claim, and no experimental validation.",
+  "healthy_baseline": {
+    "final_speed_rpm": 1464.366455498739,
+    "final_slip": 0.023755696334173945,
+    "phase_current_rms_a": [
+      5.5653699725493375,
+      5.565370052299411,
+      5.565370002529233
+    ],
+    "current_unbalance_pct": 1.4329698309573902e-06,
+    "negative_sequence_a": 4.651388311395652e-08,
+    "torque_ripple_nm": 6.265138020943416e-06,
+    "power_balance_residual_rel": 9.442665079837727e-15,
+    "sources": {
+      "speed_slip": "fault_02 summary (healthy_final_*)",
+      "electrical": "fault_03 summary (healthy metrics)",
+      "power_balance": "fault_03 summary (healthy_power_balance_residual_rel)"
+    }
+  },
+  "conditions": [
+    {
+      "key": "healthy",
+      "name": "Healthy baseline (balanced 50 Hz supply, 15.0 N m load)",
+      "classification": "Reference baseline \u2014 no fault",
+      "mechanism": "Fifth-order two-axis (dq) squirrel-cage model, Krause convention; balanced sinusoidal supply; constant load torque.",
+      "affected_signal": "i_abc, i_qd, T_e, speed, slip (all simulated)",
+      "expected_signature": "Balanced 50 Hz phase currents; near-DC synchronous-frame currents after start-up; constant slip > 0; no sidebands, no negative sequence.",
+      "limitations": [
+        "Linear magnetics, sinusoidal MMF, uniform air gap; literature parameters; no noise; not experimentally validated."
+      ],
+      "doc": "docs/healthy_baseline.md",
+      "provenance": {
+        "traces": "simulated",
+        "parameters": "literature_example",
+        "experimental_validation": false
+      },
+      "measured": {
+        "final_speed_rpm": 1464.366455498739,
+        "final_slip": 0.023755696334173945,
+        "phase_current_rms_a": [
+          5.5653699725493375,
+          5.565370052299411,
+          5.565370002529233
+        ],
+        "current_unbalance_pct": 1.4329698309573902e-06,
+        "negative_sequence_a": 4.651388311395652e-08,
+        "torque_ripple_nm": 6.265138020943416e-06,
+        "power_balance_residual_rel": 9.442665079837727e-15,
+        "sources": {
+          "speed_slip": "fault_02 summary (healthy_final_*)",
+          "electrical": "fault_03 summary (healthy metrics)",
+          "power_balance": "fault_03 summary (healthy_power_balance_residual_rel)"
+        }
+      }
+    },
+    {
+      "key": "fault_01",
+      "name": "Fault 01 \u2014 stator resistance imbalance (+10% phase A)",
+      "classification": "Physically modelled in the reduced-order plant (proxy for a high-resistance connection/joint; NOT a turn fault)",
+      "mechanism": "Per-phase stator resistances (1.5455, 1.405, 1.405) Ohm projected into the synchronous qd frame as a time-varying resistance matrix; rotor, flux map, torque, mechanics unchanged.",
+      "affected_signal": "Stator currents (sequence components), qd currents, torque ripple",
+      "expected_signature": "Nonzero negative-sequence current, phase current unbalance, and qd/torque ripple at twice supply frequency.",
+      "limitations": [
+        "Not an inter-turn-short model; no thermal dynamics, no zero-sequence path; unbalance metrics are not unique discriminants (supply unbalance or load also move them)."
+      ],
+      "doc": "docs/fault_01_stator_resistance_imbalance.md",
+      "provenance": {
+        "traces": "simulated",
+        "parameters": "literature_example",
+        "experimental_validation": false
+      },
+      "measured": {
+        "speed_rpm": 1464.6077371251179,
+        "slip": 0.023594841916588206,
+        "speed_slip_derivation": "healthy + stored difference (summary stores differences only)",
+        "phase_current_rms_a": [
+          5.531678845549609,
+          5.629583373372391,
+          5.534803749658865
+        ],
+        "current_unbalance_pct": 1.759178383824451,
+        "negative_sequence_a": 0.06444035945296703,
+        "negative_sequence_pct": 1.157923199904619,
+        "torque_ripple_nm": 0.19008993202905622,
+        "power_balance_residual_rel": 3.979624584836869e-08,
+        "primary_signature": "negative-sequence current: 4.651e-08 A -> 0.06444 A (1.158% of positive sequence)"
+      },
+      "summary_source": "fault_01_stator_resistance_imbalance_summary.json",
+      "trace_source": "fault_01_stator_resistance_imbalance.npz"
+    },
+    {
+      "key": "fault_02",
+      "name": "Condition 02 \u2014 increased mechanical load (+50%, 15.0 -> 22.5 N m)",
+      "classification": "Operating-condition change, NOT an internal motor fault (confounder for current-magnitude and slip features)",
+      "mechanism": "Only the constant load torque changes (15.0 -> 22.5 N m); motor equations, parameters, and supply are unchanged.",
+      "affected_signal": "Speed, slip, torque, current magnitude (i_qs, phase RMS)",
+      "expected_signature": "Lower speed, higher slip, proportionally higher mean torque and current; currents remain balanced.",
+      "limitations": [
+        "Constant torque load only (no fan-type load); an internal fault can raise current too, so magnitude alone does not identify the cause."
+      ],
+      "doc": "docs/fault_02_increased_mechanical_load.md",
+      "provenance": {
+        "traces": "simulated",
+        "parameters": "literature_example",
+        "experimental_validation": false
+      },
+      "measured": {
+        "speed_rpm": 1445.6118634338961,
+        "slip": 0.03625875771073608,
+        "phase_current_rms_a": null,
+        "current_unbalance_pct": "0 (balanced by construction)",
+        "negative_sequence_a": null,
+        "torque_ripple_nm": null,
+        "power_balance_residual_rel": 2.47910305410131e-14,
+        "late_mean_torque_nm": 22.951881904491103,
+        "late_mean_i_qs_a": 7.78244365674234,
+        "primary_signature": "slip: 0.02376 -> 0.03626 (+50% load); mean i_qs: 5.223 A -> 7.782 A"
+      },
+      "summary_source": "fault_02_increased_mechanical_load_summary.json",
+      "trace_source": "fault_02_increased_mechanical_load.npz"
+    },
+    {
+      "key": "fault_03",
+      "name": "Fault 03 \u2014 supply voltage unbalance (phase C at 0.9 p.u.)",
+      "classification": "Supply-side confounder, physically modelled supply; motor equations and parameters unchanged (NOT winding damage)",
+      "mechanism": "Per-phase voltage multipliers (1.0, 1.0, 0.9) create a negative-sequence voltage that drives a negative-sequence current through the healthy machine.",
+      "affected_signal": "Supply voltages, phase currents, torque ripple at 2*omega_e",
+      "expected_signature": "Voltage unbalance factor ~3.45%, large current unbalance, negative-sequence current, second-harmonic torque ripple.",
+      "limitations": [
+        "Static magnitude unbalance only (no angle unbalance or sags); mimics some signatures of winding damage \u2014 must be separated from Fault 01 by recording the supply independently."
+      ],
+      "doc": "docs/fault_03_supply_voltage_unbalance.md",
+      "provenance": {
+        "traces": "simulated",
+        "parameters": "literature_example",
+        "experimental_validation": false
+      },
+      "measured": {
+        "speed_rpm": 1461.618282562841,
+        "slip": 0.025587811624772902,
+        "speed_slip_derivation": "healthy + stored difference (summary stores differences only)",
+        "phase_current_rms_a": [
+          7.00692510210232,
+          6.412361653296248,
+          3.7325035843890424
+        ],
+        "current_unbalance_pct": 57.272531663079285,
+        "negative_sequence_a": 1.9098521693075703,
+        "negative_sequence_pct": 34.26774078501647,
+        "supply_voltage_unbalance_pct": 3.4482758620691882,
+        "torque_ripple_nm": 5.4166232101879945,
+        "power_balance_residual_rel": 8.879761914179219e-07,
+        "primary_signature": "current unbalance: 1.433e-06% -> 57.27%; negative sequence: 1.91 A (34.27%) at 3.448% VUF"
+      },
+      "summary_source": "fault_03_supply_voltage_unbalance_summary.json",
+      "trace_source": "fault_03_supply_voltage_unbalance.npz"
+    },
+    {
+      "key": "fault_04",
+      "name": "Fault 04 \u2014 bearing outer-race fault (BPFO vibration signature)",
+      "classification": "Simulation-only vibration-channel signature (bearing kinematics + assumed resonance); electrical plant bit-for-bit healthy \u2014 NOT a motor-model fault, NOT an MCSA bearing claim",
+      "mechanism": "Impact train at BPFO = (Nb/2) f_r (1 - (Bd/Pd) cos(phi)) from the simulated speed trace, exciting an assumed 2 kHz structural resonance; nothing injected into the ODEs.",
+      "affected_signal": "Simulated accelerometer channel only (m/s^2)",
+      "expected_signature": "Envelope-spectrum lines at BPFO (~87.5 Hz at the simulated steady speed) and its harmonics; healthy channel is exactly zero by construction.",
+      "limitations": [
+        "Amplitude is an arbitrary, uncalibrated scale; healthy vibration floor is identically zero (no robustness claim); bearing geometry is a literature example; no stator-current bearing signature is modelled."
+      ],
+      "doc": "docs/fault_04_bearing_outer_race.md",
+      "provenance": {
+        "traces": "simulated",
+        "parameters": "literature_example",
+        "experimental_validation": false
+      },
+      "measured": {
+        "speed_rpm": 1464.366455498739,
+        "slip": 0.023755696334173945,
+        "electrical_note": "bit-identical to healthy by construction",
+        "bpfo_hz": 87.49065692682353,
+        "shaft_hz_mean": 24.406111085553345,
+        "envelope_bpfo_healthy": 0.0,
+        "envelope_bpfo_fault": 0.15268396403300677,
+        "envelope_bpfo_2x_healthy": 0.0,
+        "envelope_bpfo_2x_fault": 0.09547199716897213,
+        "power_balance_residual_rel": 9.442665079837727e-15,
+        "primary_signature": "envelope amplitude at BPFO (87.49 Hz): 0 -> 0.1527 m/s^2 (2 x BPFO: 0.09547 m/s^2); electrical traces bit-identical to healthy"
+      },
+      "summary_source": "fault_04_bearing_outer_race_summary.json",
+      "trace_source": "fault_04_bearing_outer_race.npz"
+    },
+    {
+      "key": "fault_05",
+      "name": "Fault 05 \u2014 rotor electrical asymmetry, severity 0.10 (broken-bar proxy)",
+      "classification": "Simulation-only proxy for broken-bar-related behaviour (rotor-frame axis resistance split); NOT bar-resolved, NOT severity-calibrated, NOT a real-machine diagnosis",
+      "mechanism": "Rotor q/d axis resistances R_r(1 +/- delta) with mean R_r preserved; in the synchronous frame this modulates at 2 s_ref f_s, producing stator sidebands near f_s(1 -/+ 2s).",
+      "affected_signal": "Stator current spectrum (sidebands), qd modulation tone, small torque ripple",
+      "expected_signature": "Sidebands near f_s(1 - 2s) ~ 47.6 Hz and f_s(1 + 2s) ~ 52.4 Hz; synchronous-frame tone at 2 s f_s ~ 2.38 Hz; mean operating point essentially unchanged.",
+      "limitations": [
+        "Modulation phase uses a constant reference slip (not the true slip-angle integral during start-up); delta is a modelling knob, not a bar count; mean-resistance rise of a real broken bar is not modelled."
+      ],
+      "doc": "docs/fault_05_rotor_asymmetry.md",
+      "provenance": {
+        "traces": "simulated",
+        "parameters": "literature_example",
+        "experimental_validation": false
+      },
+      "measured": {
+        "speed_rpm": 1461.8375235610717,
+        "slip": 0.02544165095928533,
+        "speed_slip_derivation": "healthy + stored difference (summary stores differences only)",
+        "phase_current_rms_a": null,
+        "phase_a_fundamental_a": 7.867991531036202,
+        "lower_sideband_hz": 47.624430214822254,
+        "upper_sideband_hz": 52.375569785177746,
+        "lower_sideband_a": 0.22434282798247293,
+        "upper_sideband_a": 0.22822713346772913,
+        "sync_modulation_tone_a": 0.45235385768987946,
+        "torque_ripple_nm": 0.054427608678924454,
+        "power_balance_residual_rel": 4.074916269441717e-13,
+        "primary_signature": "phase-a sidebands at f_s(1-/+2s): 0.0002624 -> 0.2243 A at 47.62 Hz and 0.2282 A at 52.38 Hz; 2 s f_s tone 0.4524 A"
+      },
+      "summary_source": "fault_05_rotor_asymmetry_summary.json",
+      "trace_source": "fault_05_rotor_asymmetry.npz"
+    }
+  ],
+  "consistency_checks": [
+    {
+      "name": "provenance_tags",
+      "status": "pass",
+      "detail": "every summary tags parameters as literature_example and traces as simulated"
+    },
+    {
+      "name": "healthy_columns_consistent",
+      "status": "pass",
+      "detail": "max |healthy phase RMS (fault_01) - (fault_03)| = 0.000e+00 A (all studies regenerated with the current code)"
+    },
+    {
+      "name": "fault_04_electrical_untouched",
+      "status": "pass",
+      "detail": "fault_04 npz: healthy_i_abc == fault_i_abc elementwise"
+    },
+    {
+      "name": "traces_finite",
+      "status": "pass",
+      "detail": "all npz arrays finite"
+    },
+    {
+      "name": "power_balance_healthy",
+      "status": "pass",
+      "detail": "worst healthy relative residual = 9.44e-15 (< 1e-10)"
+    },
+    {
+      "name": "power_balance_faulted",
+      "status": "pass",
+      "detail": "worst faulted relative residual = 8.88e-07 (< 1e-05; np.gradient artifact, converges as dt^2)"
+    },
+    {
+      "name": "fault_03_signature",
+      "status": "pass",
+      "detail": "VUF = 3.448% (expected ~3.448%), I2 = 1.910 A"
+    },
+    {
+      "name": "fault_04_signature",
+      "status": "pass",
+      "detail": "BPFO = 87.49 Hz, measured envelope peak at 87.59 Hz, healthy envelope line = 0 (idealised: zero vibration floor)"
+    },
+    {
+      "name": "fault_05_signature",
+      "status": "pass",
+      "detail": "sideband bins at f_s(1-2s_ref) = 47.62 Hz; fault/healthy amplitude ratio = 9e+02"
+    }
+  ],
+  "all_checks_pass": true,
+  "artifacts": {
+    "json": "/Users/ayaankabir/Projects/induction-motor-condition-monitoring/results/fault_overview_summary.json",
+    "markdown_table": "/Users/ayaankabir/Projects/induction-motor-condition-monitoring/results/fault_overview_table.md",
+    "figure": "/Users/ayaankabir/Projects/induction-motor-condition-monitoring/results/fault_overview_comparison.png"
+  }
+}

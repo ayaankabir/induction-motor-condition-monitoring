@@ -1,0 +1,28 @@
+{
+  "dataset_label": "simulated",
+  "git_commit": "ebe881a7557ed6c504065bc8e94b99740560cbd7",
+  "initial_condition": {
+    "description": "start from rest; direct-on-line startup"
+  },
+  "output_files": [
+    "results/healthy_startup.npz",
+    "results/healthy_startup_summary.json",
+    "results/healthy_speed.png",
+    "results/healthy_torque.png",
+    "results/healthy_currents.png",
+    "results/healthy_i_qd.png",
+    "results/healthy_slip.png",
+    "results/healthy_startup_provenance.json"
+  ],
+  "parameter_hash": "352cede8a1d7bcb71b40372ec1914eec1d9146fb63a4c95323155bedade5e821",
+  "parameter_source": "literature_example",
+  "solver_settings": {
+    "atol": 1e-08,
+    "max_step": 0.0001,
+    "method": "RK45",
+    "output_dt": 0.0001,
+    "rtol": 1e-06,
+    "t_end": 1.0
+  },
+  "timestamp": "2026-09-25T17:45:39.827899+00:00"
+}

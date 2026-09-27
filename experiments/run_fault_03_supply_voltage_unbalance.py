@@ -11,6 +11,7 @@ not a confirmed internal motor fault.  All traces are simulated.
 from __future__ import annotations
 
 from dataclasses import asdict
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -32,11 +33,22 @@ from imcm.models.operating_scenario import (
     fault_03_supply_voltage_unbalance_scenario,
     first_milestone_scenario,
 )
+from imcm.reporting.provenance import ProvenanceRecord
+from imcm.reporting.run_config import RunConfig, emit_run_artifacts
 from imcm.validation.fault_metrics import (
     compare_supply_unbalance_cases,
     supply_voltage_unbalance_pct,
 )
 from imcm.validation.power_balance import power_balance_window
+
+
+def _parameter_hash(params) -> str:
+    """Return a deterministic SHA-256 hash of the motor parameters."""
+    payload = asdict(params)
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode(
+        "utf-8"
+    )
+    return hashlib.sha256(canonical).hexdigest()
 
 
 def main() -> None:
@@ -87,9 +99,8 @@ def main() -> None:
         healthy_slip=healthy.slip,
         fault_slip=fault.slip,
     )
-    (out / "fault_03_supply_voltage_unbalance_summary.json").write_text(
-        json.dumps(summary, indent=2), encoding="utf-8"
-    )
+    summary_path = out / "fault_03_supply_voltage_unbalance_summary.json"
+    summary_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
 
     fig, axes = plt.subplots(5, 1, figsize=(9, 12), sharex=False)
     for index, name in enumerate(("a", "b", "c")):
@@ -131,8 +142,82 @@ def main() -> None:
     figure = out / "fault_03_supply_voltage_unbalance_comparison.png"
     fig.savefig(figure, dpi=140)
     plt.close(fig)
+
+    manifest_path = out / "fault_03_supply_voltage_unbalance_provenance.json"
+    run_config_path = out / "fault_03_supply_voltage_unbalance_run_config.json"
+
+    output_paths = [
+        out / "fault_03_supply_voltage_unbalance.npz",
+        summary_path,
+        figure,
+    ]
+    output_rel = [str(path.relative_to(ROOT)) for path in output_paths]
+    output_rel.append(str(manifest_path.relative_to(ROOT)))
+
+    solver_settings = {
+        "method": "RK45",
+        "t_end": kwargs["t_end"],
+        "max_step": kwargs["max_step"],
+        "output_dt": kwargs["output_dt"],
+        "rtol": kwargs["rtol"],
+        "atol": kwargs["atol"],
+    }
+
+    provenance = ProvenanceRecord.create(
+        dataset_label="simulated",
+        parameter_hash=_parameter_hash(fault.params),
+        parameter_source=fault.params.provenance,
+        solver_settings=solver_settings,
+        initial_condition={
+            "description": (
+                "start from rest; matched healthy and Fault 03 "
+                "supply-voltage-unbalance simulations"
+            ),
+        },
+        output_files=output_rel,
+    )
+
+    run_config = RunConfig.create(
+        condition_id="fault_03",
+        condition_kind="supply_voltage_confounder_not_internal_fault",
+        scenario_name=fault.scenario.name,
+        park_convention=fault.scenario.park_convention,
+        motor_parameters=asdict(fault.params),
+        solver_settings=solver_settings,
+        initial_condition={
+            "state": "rest",
+            "description": "start from rest; matched healthy and fault runs",
+        },
+        analysis_windows=[
+            {"name": "steady_state", "start_s": 0.8, "end_s": kwargs["t_end"]},
+        ],
+        condition_parameters={
+            "type": "supply_voltage_unbalance",
+            "supply_voltage_case": fault.scenario.supply.voltage_unbalance.label,
+            "supply_voltage_multipliers_abc": list(
+                fault.scenario.supply.voltage_unbalance.multipliers_abc
+            ),
+            "supply_phase_peak_abc_v": list(
+                fault.scenario.supply.phase_peak_abc_v
+            ),
+            "supply_frequency_hz": fault.scenario.supply.frequency_hz,
+        },
+        outputs=output_rel,
+        provenance_manifest={"path": str(manifest_path.relative_to(ROOT))},
+    )
+
+    emit_run_artifacts(
+        run_config,
+        provenance,
+        run_config_path=run_config_path,
+        manifest_path=manifest_path,
+        root=ROOT,
+    )
+
     print(json.dumps(summary, indent=2))
-    print(f"Wrote {figure}")
+    print("Wrote:")
+    for path in [*output_paths, manifest_path, run_config_path]:
+        print(f"  {path}")
 
 
 if __name__ == "__main__":

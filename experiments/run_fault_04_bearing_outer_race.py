@@ -14,6 +14,7 @@ validation in this repository.
 from __future__ import annotations
 
 from dataclasses import asdict
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -36,8 +37,19 @@ from imcm.models.operating_scenario import (
     fault_04_bearing_outer_race_scenario,
     first_milestone_scenario,
 )
+from imcm.reporting.provenance import ProvenanceRecord
+from imcm.reporting.run_config import RunConfig, emit_run_artifacts
 from imcm.validation.bearing_metrics import compare_bearing_cases
 from imcm.validation.power_balance import power_balance_window
+
+
+def _parameter_hash(params) -> str:
+    """Return a deterministic SHA-256 hash of the motor parameters."""
+    payload = asdict(params)
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode(
+        "utf-8"
+    )
+    return hashlib.sha256(canonical).hexdigest()
 
 
 def main() -> None:
@@ -94,9 +106,8 @@ def main() -> None:
         healthy_i_abc=healthy.i_abc,
         fault_i_abc=fault.i_abc,
     )
-    (out / "fault_04_bearing_outer_race_summary.json").write_text(
-        json.dumps(summary, indent=2), encoding="utf-8"
-    )
+    summary_path = out / "fault_04_bearing_outer_race_summary.json"
+    summary_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
 
     fig, axes = plt.subplots(3, 1, figsize=(9, 10), sharex=False)
     axes[0].plot(fault.t, fault.speed_rpm, label="shaft speed (simulated)")
@@ -134,8 +145,79 @@ def main() -> None:
     figure = out / "fault_04_bearing_outer_race_comparison.png"
     fig.savefig(figure, dpi=140)
     plt.close(fig)
+
+    manifest_path = out / "fault_04_bearing_outer_race_provenance.json"
+    run_config_path = out / "fault_04_bearing_outer_race_run_config.json"
+
+    output_paths = [
+        out / "fault_04_bearing_outer_race.npz",
+        summary_path,
+        figure,
+    ]
+    output_rel = [str(path.relative_to(ROOT)) for path in output_paths]
+    output_rel.append(str(manifest_path.relative_to(ROOT)))
+
+    solver_settings = {
+        "method": "RK45",
+        "t_end": kwargs["t_end"],
+        "max_step": kwargs["max_step"],
+        "output_dt": kwargs["output_dt"],
+        "rtol": kwargs["rtol"],
+        "atol": kwargs["atol"],
+    }
+
+    provenance = ProvenanceRecord.create(
+        dataset_label="simulated",
+        parameter_hash=_parameter_hash(fault.params),
+        parameter_source=fault.params.provenance,
+        solver_settings=solver_settings,
+        initial_condition={
+            "description": (
+                "start from rest; matched healthy and Fault 04 bearing "
+                "outer-race (BPFO vibration channel) simulations"
+            ),
+        },
+        output_files=output_rel,
+    )
+
+    run_config = RunConfig.create(
+        condition_id="fault_04",
+        condition_kind="simulated_bearing_vibration_signature_not_motor_model_fault",
+        scenario_name=fault.scenario.name,
+        park_convention=fault.scenario.park_convention,
+        motor_parameters=asdict(fault.params),
+        solver_settings=solver_settings,
+        initial_condition={
+            "state": "rest",
+            "description": "start from rest; electrical plant identical to healthy",
+        },
+        analysis_windows=[
+            {"name": "envelope", "start_s": 0.5, "end_s": kwargs["t_end"]},
+        ],
+        condition_parameters={
+            "type": "bearing_outer_race",
+            "bearing_fault_case": fault.scenario.bearing_fault.label,
+            "channel": "simulated_vibration_m_s2",
+            "bearing_geometry_provenance": "literature_example_6205_series",
+            "bearing_config": asdict(fault.scenario.bearing_fault),
+            "bpfo_hz": metrics.bpfo_hz,
+        },
+        outputs=output_rel,
+        provenance_manifest={"path": str(manifest_path.relative_to(ROOT))},
+    )
+
+    emit_run_artifacts(
+        run_config,
+        provenance,
+        run_config_path=run_config_path,
+        manifest_path=manifest_path,
+        root=ROOT,
+    )
+
     print(json.dumps(summary, indent=2))
-    print(f"Wrote {figure}")
+    print("Wrote:")
+    for path in [*output_paths, manifest_path, run_config_path]:
+        print(f"  {path}")
 
 
 if __name__ == "__main__":

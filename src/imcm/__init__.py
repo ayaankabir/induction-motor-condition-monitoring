@@ -1,7 +1,8 @@
 """Induction motor condition monitoring (reduced-order, simulation-first).
 
-Healthy fifth-order time-domain simulation is available. Fault models and
-experimental datasets are not.
+Provides fifth-order dq machine modeling, fault representations, signal processing,
+validation checks, and deterministic engineering-report generation. All internal machine
+traces are simulated; no experimental validation is claimed.
 """
 
 __version__ = "0.0.1"

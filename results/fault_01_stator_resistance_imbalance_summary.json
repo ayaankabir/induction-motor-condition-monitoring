@@ -1,0 +1,147 @@
+{
+  "label": "simulated_fault_01_comparison",
+  "parameter_provenance": "literature_example",
+  "healthy_metadata": {
+    "label": "healthy",
+    "provenance": "simulated",
+    "parameter_name": "illustrative_4kW_400V_50Hz_4pole",
+    "parameter_provenance": "literature_example",
+    "scenario_name": "healthy_50hz_constant_torque",
+    "park_convention": "krause_classical_2_3",
+    "solver": "RK45",
+    "max_step_s": 0.0001,
+    "rtol": 1e-06,
+    "atol": 1e-08,
+    "t_end_s": 1.0,
+    "output_dt_s": 0.0001,
+    "initial_condition": "rest",
+    "nfev": 60008,
+    "njev": 0,
+    "n_eval": 10001,
+    "message": "The solver successfully reached the end of the integration interval.",
+    "supply_frequency_hz": 50.0,
+    "load_type": "constant_torque",
+    "load_torque_nm": 15.0,
+    "stator_resistance_case": "healthy_balanced",
+    "stator_resistances_abc_ohm": [
+      1.405,
+      1.405,
+      1.405
+    ],
+    "supply_voltage_case": "balanced",
+    "supply_voltage_multipliers_abc": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "supply_phase_peak_abc_v": [
+      326.59863237109045,
+      326.59863237109045,
+      326.59863237109045
+    ],
+    "supply_unbalance": {
+      "enabled": false,
+      "label": "balanced",
+      "multipliers_abc": [
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "supply_fault": false,
+    "inverter": false,
+    "faults": false,
+    "rotor_asymmetry_case": "healthy_rotor",
+    "rotor_asymmetry_enabled": false,
+    "rotor_asymmetry_severity": 0.0,
+    "rotor_asymmetry_reference_slip": null,
+    "bearing_fault_case": "healthy_bearing",
+    "bearing_fault_enabled": false,
+    "bearing_fault_channel": "simulated_vibration_m_s2",
+    "experimental_validation": false
+  },
+  "fault_metadata": {
+    "label": "fault_01_phase_a_plus_10pct",
+    "provenance": "simulated",
+    "parameter_name": "illustrative_4kW_400V_50Hz_4pole",
+    "parameter_provenance": "literature_example",
+    "scenario_name": "fault_01_phase_a_stator_resistance_plus_10pct",
+    "park_convention": "krause_classical_2_3",
+    "solver": "RK45",
+    "max_step_s": 0.0001,
+    "rtol": 1e-06,
+    "atol": 1e-08,
+    "t_end_s": 1.0,
+    "output_dt_s": 0.0001,
+    "initial_condition": "rest",
+    "nfev": 60008,
+    "njev": 0,
+    "n_eval": 10001,
+    "message": "The solver successfully reached the end of the integration interval.",
+    "supply_frequency_hz": 50.0,
+    "load_type": "constant_torque",
+    "load_torque_nm": 15.0,
+    "stator_resistance_case": "fault_01_phase_a_plus_10pct",
+    "stator_resistances_abc_ohm": [
+      1.5455,
+      1.405,
+      1.405
+    ],
+    "supply_voltage_case": "balanced",
+    "supply_voltage_multipliers_abc": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "supply_phase_peak_abc_v": [
+      326.59863237109045,
+      326.59863237109045,
+      326.59863237109045
+    ],
+    "supply_unbalance": {
+      "enabled": false,
+      "label": "balanced",
+      "multipliers_abc": [
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "supply_fault": false,
+    "inverter": false,
+    "faults": true,
+    "rotor_asymmetry_case": "healthy_rotor",
+    "rotor_asymmetry_enabled": false,
+    "rotor_asymmetry_severity": 0.0,
+    "rotor_asymmetry_reference_slip": null,
+    "bearing_fault_case": "healthy_bearing",
+    "bearing_fault_enabled": false,
+    "bearing_fault_channel": "simulated_vibration_m_s2",
+    "experimental_validation": false
+  },
+  "metrics": {
+    "phase_current_rms_healthy_a": [
+      5.5653699725493375,
+      5.565370052299411,
+      5.565370002529233
+    ],
+    "phase_current_rms_fault_a": [
+      5.531678845549609,
+      5.629583373372391,
+      5.534803749658865
+    ],
+    "current_unbalance_healthy_pct": 1.4329698309573902e-06,
+    "current_unbalance_fault_pct": 1.759178383824451,
+    "negative_sequence_healthy_a": 4.651388311395652e-08,
+    "negative_sequence_fault_a": 0.06444035945296703,
+    "negative_sequence_healthy_pct": 8.357734173592421e-07,
+    "negative_sequence_fault_pct": 1.157923199904619,
+    "torque_ripple_healthy_nm": 6.265138020943416e-06,
+    "torque_ripple_fault_nm": 0.19008993202905622,
+    "final_speed_difference_rpm": 0.24128162637884998,
+    "final_slip_difference": -0.00016085441758573876
+  },
+  "healthy_power_balance_residual_rel": 9.442665079837727e-15,
+  "fault_power_balance_residual_rel": 3.979624584836869e-08,
+  "note": "Controlled simulated high-resistance phase-A proxy. Not experimental validation and not an inter-turn-short model."
+}

@@ -7,3 +7,9 @@ This folder is for **provenance-labeled** datasets only.
 - `literature/` — tabulated published parameters, with citation
 
 There are **no measurements in this repository yet**. Do not add unlabeled CSV files.
+
+The backend can load a caller-selected local CSV as explicitly
+`external_unvalidated` input, but importing a file does not make it a repository
+dataset or establish that it is experimental. The strict format, canonical-unit
+contract, provenance record, and read-only quality checks are documented in
+[`docs/data-import.md`](../docs/data-import.md).

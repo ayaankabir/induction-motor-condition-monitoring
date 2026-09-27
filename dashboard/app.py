@@ -238,7 +238,7 @@ def main():
         if not metrics:
             st.info("No measured metrics available for comparison.")
         else:
-            selected = st.multiselect("Metrics", metrics, default=metrics)
+            selected = st.multiselect("Metrics", metrics, default=metrics[:5])
             rows = [
                 {
                     "Condition": f"{index + 1}. {names[index]}",

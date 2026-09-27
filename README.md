@@ -7,146 +7,134 @@ No experimental measurements exist in this repository.
 
 A modular Python workspace to:
 
-1. Integrate a **fifth-order two-axis (dq) squirrel-cage induction machine** using a **single** classical Krause Park convention.
-2. Reconstruct **healthy** stator currents from that model (phase 1, implemented).
-3. Later add a **small set of physically motivated fault representations**, including only a **documented proxy** if broken-bar-like spectra are studied.
-4. Apply **electrical signal processing** (mainly MCSA) with claims matched to model fidelity.
+1. Integrate a **fifth-order two-axis (dq) squirrel-cage induction machine** using a single classical Krause Park convention.
+2. Reconstruct **healthy** stator currents from that model with explicit stated assumptions.
+3. Simulate a **small, selected set of fault and operating conditions** using physically motivated parameter or circuit modifications:
+   - **Healthy baseline:** DOL startup from rest to steady state
+   - **Fault 01:** Stator resistance imbalance (+10% phase A; high-resistance connection proxy)
+   - **Condition 02:** Increased mechanical load (+50% constant torque; operational change confounder)
+   - **Condition 03:** Supply voltage unbalance (phase C at 0.9 p.u.; supply-side confounder)
+   - **Fault 04:** Simulated bearing outer-race vibration signature (BPFO vibration channel; electrical currents bit-for-bit healthy)
+   - **Fault 05:** Rotor electrical asymmetry proxy for broken bar behavior ($2sf_s$ modulation; simulation proxy, not bar-resolved)
+4. Apply **electrical signal processing** (primarily motor current signature analysis and envelope analysis) with claims matched to model fidelity.
+5. Provide structured provenance metadata, diagnostic triage logic, a read-only Streamlit dashboard, a local REST API, and deterministic engineering-report generation (JSON, HTML, PDF, manifest).
 
 ## What this project is not
 
 - Not FEA or a winding-function replica of a specific motor
-- Not a complete condition-monitoring product
+- Not a complete commercial digital twin or turnkey condition-monitoring product
 - Not a source of fabricated lab data
-- **Not experimentally validated** — traces are ODE simulations
-- Fault simulation and a dashboard are **not** implemented yet
+- **Not experimentally validated** — all machine traces are ODE simulations
+- Not an identified model of a real motor; machine parameters are an illustrative literature benchmark
 
-## Locked decisions (healthy plant)
+## Locked decisions (modeling & physics)
 
 | Topic | Choice |
 | --- | --- |
-| Park / torque | Classical **Krause** \(2/3\) transform and \(\tfrac{3}{2}\) torque. Not power-invariant. Do not mix. |
-| Plant | Healthy fifth-order flux model only |
-| Supply | Balanced sinusoids, **50 Hz**, 400 V line-line RMS, star; **no inverter** |
-| Load | **Constant** \(T_L=15\,\mathrm{N\cdot m}\) (assumed scenario) |
-| Parameters | Illustrative **4 kW, 400 V, 50 Hz, 4-pole** literature example — **not measured** |
-| Integrator | Adaptive **RK45**, `max_step = 10^{-4}\,\mathrm{s}` |
-| Initial condition | **Start from rest** (zero flux, \(\omega_m=0\)), direct-on-line voltage |
-| Broken rotor bar | **No bar-resolved model.** A documented **simulation-only proxy** (Fault 05, rotor electrical asymmetry) exists; see [`docs/fault_05_rotor_asymmetry.md`](docs/fault_05_rotor_asymmetry.md) |
-| Scope | Simulation-only |
+| Park / torque | Classical **Krause** ($2/3$) transform and $\tfrac{3}{2}$ torque. Not power-invariant. Do not mix conventions. |
+| Plant | Fifth-order (4 electrical + 1 mechanical) flux model in the synchronous ($dq$) frame; squirrel cage ($v_{qr}=v_{dr}=0$). |
+| Supply | Balanced sinusoids, **50 Hz**, 400 V line-line RMS, star (or explicit asymmetric supply in Condition 03); **no inverter**. |
+| Load | Constant load torque ($T_L=15\,\mathrm{N\cdot m}$ nominal; stepped to $22.5\,\mathrm{N\cdot m}$ in Condition 02). |
+| Parameters | Illustrative **4 kW, 400 V, 50 Hz, 4-pole** literature example — **not measured**. |
+| Integrator | Adaptive **RK45**, `max_step = 10^{-4}\,\mathrm{s}`. |
+| Initial condition | **Start from rest** (zero flux, $\omega_m=0$), direct-on-line voltage application. |
+| Broken rotor bar | **No bar-resolved discrete cage model.** Documented **simulation-only proxy** (Fault 05, rotor electrical asymmetry); see [`docs/fault_05_rotor_asymmetry.md`](docs/fault_05_rotor_asymmetry.md). |
+| Bearing vibration | Outer-race ball-pass frequency proxy generator (Fault 04) producing an auxiliary synthetic vibration channel. |
+| Scope | Simulation-only unless real data are added with provenance. No experimental-validation claims. |
 
 Full equations, identities, tests, and limitations: [`docs/modeling-plan.md`](docs/modeling-plan.md).
+Scientific rules: [`AGENTS.md`](AGENTS.md).
 
-Agent rules: [`AGENTS.md`](AGENTS.md).
-
-## Current repository status
-
-Phase 1 **healthy plant** is implemented:
-
-- Documented assumed machine and operating scenario in `imcm.models`
-- Krause Park transforms and linear flux maps (unit-tested)
-- Time-domain RK45 integration of the fifth-order healthy ODEs
-- Start-up figures and compressed traces under `results/` after you run the experiment script
-
-Empty `data/` does **not** contain measurements. Files in `results/` are **simulated**.
-
-## Proposed architecture
+## Package Architecture
 
 ```
-supply v_abc(t)          T_L = constant
-        │                      │
-        ▼                      ▼
-┌─────────────────────────────────────┐
-│  fifth-order dq healthy plant       │  ← implemented (RK45, start from rest)
-│  Krause synchronous frame           │
-└─────────────────┬───────────────────┘
-                  │
-                  ▼
-        i_abc, ω_m, T_e   (label: simulated, healthy)
-                  │
-                  ▼
-        later: fault wrappers, MCSA, reports
+src/imcm/
+├── analysis/     # Spectral analysis, FFT, and MCSA sideband extraction
+├── data/         # Provenance schemas, trace containers, and CSV importer
+├── faults/       # Fault catalog and Fault 04 bearing vibration proxy generator
+├── models/       # Parameters, Krause ODEs, flux maps, and fault modifications
+├── processing/   # Envelope demodulation (Hilbert transform)
+├── reporting/    # Engineering report generator, HTML/PDF renderers, triage, and provenance
+├── signals/      # Krause abc <-> qd0 reference frame transformations
+└── validation/   # Power balance, equivalent circuit, signal quality, and metrics
 ```
 
-| Package | Responsibility |
-| --- | --- |
-| `imcm.models` | Parameters, scenario, flux map, healthy ODEs |
-| `imcm.signals` | Krause \(abc\leftrightarrow qd0\) |
-| `imcm.validation` | Power balance and equivalent-circuit checks |
-| `imcm.reporting` | Static start-up figures (not a dashboard) |
-| `imcm.faults` | Fault catalog and the Fault 04 vibration-channel generator; Fault 05 proxy physics lives in `imcm.models.rotor_asymmetry` |
-| `imcm.processing` | Spectra (later) |
+## Results & Reproducibility Tracking
 
-## Modeling approach (short)
+The repository tracks lightweight summary and provenance metadata under `results/`:
 
-**Healthy machine:** fifth-order flux-linkage model in the **synchronous** \(dq\) frame;
-squirrel-cage \(v_{qr}=v_{dr}=0\); linear \(L_s,L_r,L_m\); inertia and viscous friction.
+- **7 tracked summary JSON files:**
+  - `healthy_startup_summary.json`
+  - `fault_01_stator_resistance_imbalance_summary.json`
+  - `fault_02_increased_mechanical_load_summary.json`
+  - `fault_03_supply_voltage_unbalance_summary.json`
+  - `fault_04_bearing_outer_race_summary.json`
+  - `fault_05_rotor_asymmetry_summary.json`
+  - `fault_overview_summary.json`
+- **2 tracked provenance manifests:**
+  - `healthy_startup_provenance.json`
+  - `fault_01_stator_resistance_imbalance_provenance.json`
 
-**Why this order:** electrical currents are the sensors. Third-order and first-order
-models cannot support this project. FEA and per-bar circuits are higher fidelity than
-we will claim.
+Heavy simulation trace archives (`.npz`), plots (`.png`), and generated reports (`.html`, `.pdf`) are excluded via `.gitignore` to keep the repository lightweight and portable. Any missing run-configuration or additional provenance files are intentionally not backfilled by rerunning simulations — this preserves repository portability without claiming complete historical provenance for every run. All simulation results can be reproduced by running the corresponding experiment scripts.
 
-**Why Krause, not power-invariant:** matches Krause/Ong bookkeeping; balanced supply
-maps to \(v_{qs}=V_s\), \(v_{ds}=0\); torque uses \(\tfrac{3}{2}\). Changing convention
-requires rewriting transforms, torque, and power tests together.
-
-**Faults:** not in this milestone. When added, change the equations; do not paste
-MCSA sidebands onto healthy currents. A two-axis rotor-asymmetry model is a **proxy**,
-not a complete broken-bar simulation.
-
-## How to install, test, and run the healthy simulation
-
-From the repository root:
+## Installation & Testing
 
 ```bash
-source .venv/bin/activate   # if the local venv exists
+# Optional: create and activate virtual environment
+python3 -m venv .venv
+source .venv/bin/activate
+
+# Install editable package with dev dependencies
 pip install -e ".[dev]"
-python -m pytest
-python experiments/run_healthy_startup.py
+
+# Run test suite
+python -m pytest tests/
 ```
 
-The experiment writes:
+## Running Simulations
 
-- `results/healthy_startup.npz` — simulated time series
-- `results/healthy_startup_summary.json` — solver metadata and sanity numbers
-- `results/healthy_speed.png`, `healthy_torque.png`, `healthy_currents.png`,
-  `healthy_i_qd.png`, `healthy_slip.png`
+```bash
+# Run healthy start-up baseline
+python experiments/run_healthy_startup.py
 
-Do not look in `data/` for measurements; there are none.
+# Run condition studies
+python experiments/run_fault_01_stator_resistance_imbalance.py
+python experiments/run_fault_02_increased_mechanical_load.py
+python experiments/run_fault_03_supply_voltage_unbalance.py
+python experiments/run_fault_04_bearing_outer_race.py
+python experiments/run_fault_05_rotor_asymmetry.py
 
-## Development roadmap
+# Run unified overview comparison
+python experiments/run_fault_overview.py
+```
 
-| Phase | Goal | Exit criterion |
-| --- | --- | --- |
-| **0 — Foundation** | Docs, conventions, assumed parameters, equation tests | Done |
-| **1 — Healthy plant** | Time-domain fifth-order model, \(abc\) currents | RK45 start-up; slip/torque vs equivalent circuit; balanced currents |
-| **2 — Numerical hygiene** | Step size, power balance, transform tests on simulated traces | Tests fail if energy or frames break |
-| **3 — Voltage unbalance** | Confounder; same healthy ODEs | Negative-sequence current; labeled **supply**, not winding damage |
-| **4 — Stator \(R\) unbalance** | Unequal phase resistances | High-resistance connection, **not** turn fault |
-| **5 — Rotor asymmetry** | **Done as a documented simulation-only proxy** (Fault 05): rotor-frame axis resistance split \(R_r(1\pm\delta)\), synchronous-frame modulation at \(2sf_s\). Not bar-resolved, not severity-calibrated. A reduced coupled-circuit cage stays optional later work | Sidebands near \(f_s(1\pm 2s)\) on simulated traces; **never** “bar count” |
-| **6 — MCSA pipeline** | Windowed spectra, slip-aware bins | Features from simulated traces + metadata only |
-| **7 — Optional** | Public dataset or lab plan **if** they exist | Never invent traces |
-| **8 — Optional** | Report UI | Visualization of **already computed** results |
+## Generating Deterministic Engineering Reports
 
-Do not start phase \(n+1\) until phase \(n\) is verified. **Do not add faults until approved.**
+Compile standalone engineering reports from existing simulation results:
 
-## Assumptions
+```bash
+python -m imcm.reporting.generate_report \
+  --output-dir build/report/ \
+  --generated-at-utc "2026-01-01T00:00:00+00:00" \
+  --results-dir results/
+```
 
-- Linear magnetics, sinusoidal MMF, uniform air gap
-- Single equivalent rotor cage, stator-referred
-- Ideal 50 Hz three-phase sinusoids (PWM deferred)
-- Constant inertia, viscous friction, **constant load torque**
-- Classical Krause \(qd0\) scaling
-- Parameters from a published illustrative machine, not a measured lab motor
-- Direct-on-line start from rest (large inrush is expected in the model)
+This generates:
+- `imcm_engineering_report.json`
+- `imcm_engineering_report.html`
+- `imcm_engineering_report.pdf`
+- `imcm_engineering_report_manifest.json`
 
-## Remaining uncertainties
+## Interactive Dashboard & API
 
-- Whether experimental current data will ever exist
-- Proxy vs coupled-circuit cage **if** broken-bar work is requested later
-- Optional fan-type load comparison after constant-\(T_L\) verification
-- Optional near-steady flux initial condition for monitoring-window studies
+```bash
+# Launch read-only Streamlit dashboard
+streamlit run dashboard/app.py
 
-## License / academic use
+# Launch local REST API service
+uvicorn api.main:app --reload
+```
 
-For coursework and research notes. Cite Krause, Ong, and MCSA survey literature
-when the report is written. Do not copy restricted datasets into `data/` without provenance.
+## Academic Use & Citations
+
+For coursework and research notes. Cite Krause, Ong, and MCSA survey literature. Do not copy restricted datasets into `data/` without provenance.

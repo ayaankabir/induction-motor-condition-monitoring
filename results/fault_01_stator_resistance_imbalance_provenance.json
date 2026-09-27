@@ -1,0 +1,24 @@
+{
+  "dataset_label": "simulated",
+  "git_commit": "ebe881a7557ed6c504065bc8e94b99740560cbd7",
+  "initial_condition": {
+    "description": "start from rest; matched healthy and Fault 01 stator-resistance-imbalance simulations"
+  },
+  "output_files": [
+    "results/fault_01_stator_resistance_imbalance.npz",
+    "results/fault_01_stator_resistance_imbalance_summary.json",
+    "results/fault_01_stator_resistance_imbalance_comparison.png",
+    "results/fault_01_stator_resistance_imbalance_provenance.json"
+  ],
+  "parameter_hash": "352cede8a1d7bcb71b40372ec1914eec1d9146fb63a4c95323155bedade5e821",
+  "parameter_source": "literature_example",
+  "solver_settings": {
+    "atol": 1e-08,
+    "max_step": 0.0001,
+    "method": "RK45",
+    "output_dt": 0.0001,
+    "rtol": 1e-06,
+    "t_end": 1.0
+  },
+  "timestamp": "2026-09-25T17:45:42.852992+00:00"
+}

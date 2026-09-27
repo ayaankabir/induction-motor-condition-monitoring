@@ -1,0 +1,72 @@
+{
+  "label": "healthy",
+  "provenance": "simulated",
+  "parameter_name": "illustrative_4kW_400V_50Hz_4pole",
+  "parameter_provenance": "literature_example",
+  "scenario_name": "healthy_50hz_constant_torque",
+  "park_convention": "krause_classical_2_3",
+  "solver": "RK45",
+  "max_step_s": 0.0001,
+  "rtol": 1e-06,
+  "atol": 1e-08,
+  "t_end_s": 1.0,
+  "output_dt_s": 0.0001,
+  "initial_condition": "rest",
+  "nfev": 60008,
+  "njev": 0,
+  "n_eval": 10001,
+  "message": "The solver successfully reached the end of the integration interval.",
+  "supply_frequency_hz": 50.0,
+  "load_type": "constant_torque",
+  "load_torque_nm": 15.0,
+  "stator_resistance_case": "healthy_balanced",
+  "stator_resistances_abc_ohm": [
+    1.405,
+    1.405,
+    1.405
+  ],
+  "supply_voltage_case": "balanced",
+  "supply_voltage_multipliers_abc": [
+    1.0,
+    1.0,
+    1.0
+  ],
+  "supply_phase_peak_abc_v": [
+    326.59863237109045,
+    326.59863237109045,
+    326.59863237109045
+  ],
+  "supply_unbalance": {
+    "enabled": false,
+    "label": "balanced",
+    "multipliers_abc": [
+      1.0,
+      1.0,
+      1.0
+    ]
+  },
+  "supply_fault": false,
+  "inverter": false,
+  "faults": false,
+  "rotor_asymmetry_case": "healthy_rotor",
+  "rotor_asymmetry_enabled": false,
+  "rotor_asymmetry_severity": 0.0,
+  "rotor_asymmetry_reference_slip": null,
+  "bearing_fault_case": "healthy_bearing",
+  "bearing_fault_enabled": false,
+  "bearing_fault_channel": "simulated_vibration_m_s2",
+  "experimental_validation": false,
+  "steady_window_t_start_s": 0.8,
+  "mean_slip": 0.023755699417994425,
+  "mean_speed_rpm": 1464.3664508730085,
+  "mean_tau_e_nm": 15.45774447393265,
+  "tau_l_nm": 15.0,
+  "mean_B_omega_nm": 0.4577440669804872,
+  "torque_balance_nm": 4.06952162634866e-07,
+  "phase_a_current_rms_a": 5.565204049560827,
+  "power_balance_residual_rel": 9.442665079837727e-15,
+  "equivalent_circuit_tau_e_nm": 15.457745034943295,
+  "equivalent_circuit_is_rms_a": 5.565370175028432,
+  "parameter_notes": "Illustrative squirrel-cage parameters consistent with a published 4 kW, 400 V, 50 Hz, 1430 r/min, 4-pole SI example. Not measured on a physical motor in this repository. Provenance: literature_example.",
+  "honesty": "Waveforms are ODE simulation. Parameters are a published illustrative set, not measurements. No experimental validation."
+}

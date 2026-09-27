@@ -15,6 +15,7 @@ representation differs from the healthy baseline.
 from __future__ import annotations
 
 from dataclasses import asdict
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -36,12 +37,23 @@ from imcm.models.operating_scenario import (
     fault_05_rotor_asymmetry_scenario,
     first_milestone_scenario,
 )
+from imcm.reporting.provenance import ProvenanceRecord
+from imcm.reporting.run_config import RunConfig, emit_run_artifacts
 from imcm.validation.power_balance import power_balance_window
 from imcm.validation.rotor_asymmetry_metrics import (
     compare_rotor_asymmetry_cases,
     modulation_frequency_hz,
     sideband_frequencies_hz,
 )
+
+
+def _parameter_hash(params) -> str:
+    """Return a deterministic SHA-256 hash of the motor parameters."""
+    payload = asdict(params)
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode(
+        "utf-8"
+    )
+    return hashlib.sha256(canonical).hexdigest()
 
 # The proxy sidebands sit only 2*s*f_s ~ 2.4 Hz from the 50 Hz carrier, so the
 # matched runs use a 3 s window (bin spacing 1/3 Hz) to resolve them.  Both
@@ -96,9 +108,8 @@ def main() -> None:
         healthy_slip=healthy.slip,
         fault_slip=fault.slip,
     )
-    (out / "fault_05_rotor_asymmetry_summary.json").write_text(
-        json.dumps(summary, indent=2), encoding="utf-8"
-    )
+    summary_path = out / "fault_05_rotor_asymmetry_summary.json"
+    summary_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
 
     # Comparison figure: late-window phase-a spectrum around the fundamental
     # (sidebands visible), synchronous-frame modulation tone, torque, speed.
@@ -153,8 +164,78 @@ def main() -> None:
     figure = out / "fault_05_rotor_asymmetry_comparison.png"
     fig.savefig(figure, dpi=140)
     plt.close(fig)
+
+    manifest_path = out / "fault_05_rotor_asymmetry_provenance.json"
+    run_config_path = out / "fault_05_rotor_asymmetry_run_config.json"
+
+    output_paths = [
+        out / "fault_05_rotor_asymmetry.npz",
+        summary_path,
+        figure,
+    ]
+    output_rel = [str(path.relative_to(ROOT)) for path in output_paths]
+    output_rel.append(str(manifest_path.relative_to(ROOT)))
+
+    solver_settings = {
+        "method": "RK45",
+        "t_end": kwargs["t_end"],
+        "max_step": kwargs["max_step"],
+        "output_dt": kwargs["output_dt"],
+        "rtol": kwargs["rtol"],
+        "atol": kwargs["atol"],
+    }
+
+    provenance = ProvenanceRecord.create(
+        dataset_label="simulated",
+        parameter_hash=_parameter_hash(fault.params),
+        parameter_source=fault.params.provenance,
+        solver_settings=solver_settings,
+        initial_condition={
+            "description": (
+                "start from rest; matched healthy and Fault 05 rotor "
+                "electrical asymmetry proxy simulations"
+            ),
+        },
+        output_files=output_rel,
+    )
+
+    run_config = RunConfig.create(
+        condition_id="fault_05",
+        condition_kind="rotor_electrical_asymmetry_proxy_not_complete_broken_bar_model",
+        scenario_name=fault.scenario.name,
+        park_convention=fault.scenario.park_convention,
+        motor_parameters=asdict(fault.params),
+        solver_settings=solver_settings,
+        initial_condition={
+            "state": "rest",
+            "description": "start from rest; matched healthy and proxy runs",
+        },
+        analysis_windows=[
+            {"name": "metric", "start_s": METRIC_WINDOW_START_S, "end_s": T_END_S},
+        ],
+        condition_parameters={
+            "type": "rotor_asymmetry",
+            "rotor_asymmetry_case": fault.scenario.rotor_asymmetry.label,
+            "rotor_asymmetry_config": asdict(fault.scenario.rotor_asymmetry),
+            "severity": fault.scenario.rotor_asymmetry.severity,
+            "reference_slip": fault.scenario.rotor_asymmetry.reference_slip,
+        },
+        outputs=output_rel,
+        provenance_manifest={"path": str(manifest_path.relative_to(ROOT))},
+    )
+
+    emit_run_artifacts(
+        run_config,
+        provenance,
+        run_config_path=run_config_path,
+        manifest_path=manifest_path,
+        root=ROOT,
+    )
+
     print(json.dumps(summary, indent=2))
-    print(f"Wrote {figure}")
+    print("Wrote:")
+    for path in [*output_paths, manifest_path, run_config_path]:
+        print(f"  {path}")
 
 
 if __name__ == "__main__":

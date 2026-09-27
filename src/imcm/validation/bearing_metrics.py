@@ -14,6 +14,11 @@ from math import pi
 import numpy as np
 
 from imcm.models.operating_scenario import BearingFaultConfig
+from imcm.analysis.spectral_analysis import (
+    compute_envelope_spectrum,
+    find_interpolated_peak_frequency,
+    find_peak_amplitude,
+)
 from imcm.processing.envelope import (
     amplitude_near,
     envelope_spectrum,
@@ -92,7 +97,7 @@ def bearing_vibration_features(
     fs = 1.0 / float(np.mean(np.diff(t_w)))
     shaft_hz = float(np.mean(omega_w)) / (2.0 * pi)
     bpfo_hz = config.bpfo_hz(shaft_hz)
-    spec = envelope_spectrum(
+    spec = compute_envelope_spectrum(
         vib_w,
         fs,
         band=(
@@ -103,9 +108,15 @@ def bearing_vibration_features(
     return BearingVibrationFeatures(
         bpfo_hz=bpfo_hz,
         shaft_hz_mean=shaft_hz,
-        envelope_bpfo_amplitude=amplitude_near(spec, bpfo_hz, band_half_width_hz),
-        envelope_bpfo_2x_amplitude=amplitude_near(spec, 2.0 * bpfo_hz, band_half_width_hz),
-        envelope_bpfo_peak_hz=peak_frequency_near(spec, bpfo_hz, band_half_width_hz),
+        envelope_bpfo_amplitude=find_peak_amplitude(
+            spec.freq_hz, spec.amplitude, bpfo_hz, band_half_width_hz
+        ),
+        envelope_bpfo_2x_amplitude=find_peak_amplitude(
+            spec.freq_hz, spec.amplitude, 2.0 * bpfo_hz, band_half_width_hz
+        ),
+        envelope_bpfo_peak_hz=find_interpolated_peak_frequency(
+            spec.freq_hz, spec.amplitude, bpfo_hz, band_half_width_hz
+        ),
     )
 
 

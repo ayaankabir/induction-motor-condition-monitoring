@@ -1,0 +1,150 @@
+{
+  "label": "simulated_fault_04_bearing_outer_race_bpfo_comparison",
+  "condition_kind": "simulated_bearing_vibration_signature_not_motor_model_fault",
+  "parameter_provenance": "literature_example",
+  "bearing_geometry_provenance": "literature_example_6205_series",
+  "healthy_metadata": {
+    "label": "healthy",
+    "provenance": "simulated",
+    "parameter_name": "illustrative_4kW_400V_50Hz_4pole",
+    "parameter_provenance": "literature_example",
+    "scenario_name": "healthy_50hz_constant_torque",
+    "park_convention": "krause_classical_2_3",
+    "solver": "RK45",
+    "max_step_s": 0.0001,
+    "rtol": 1e-06,
+    "atol": 1e-08,
+    "t_end_s": 1.0,
+    "output_dt_s": 0.0001,
+    "initial_condition": "rest",
+    "nfev": 60008,
+    "njev": 0,
+    "n_eval": 10001,
+    "message": "The solver successfully reached the end of the integration interval.",
+    "supply_frequency_hz": 50.0,
+    "load_type": "constant_torque",
+    "load_torque_nm": 15.0,
+    "stator_resistance_case": "healthy_balanced",
+    "stator_resistances_abc_ohm": [
+      1.405,
+      1.405,
+      1.405
+    ],
+    "supply_voltage_case": "balanced",
+    "supply_voltage_multipliers_abc": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "supply_phase_peak_abc_v": [
+      326.59863237109045,
+      326.59863237109045,
+      326.59863237109045
+    ],
+    "supply_unbalance": {
+      "enabled": false,
+      "label": "balanced",
+      "multipliers_abc": [
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "supply_fault": false,
+    "inverter": false,
+    "faults": false,
+    "rotor_asymmetry_case": "healthy_rotor",
+    "rotor_asymmetry_enabled": false,
+    "rotor_asymmetry_severity": 0.0,
+    "rotor_asymmetry_reference_slip": null,
+    "bearing_fault_case": "healthy_bearing",
+    "bearing_fault_enabled": false,
+    "bearing_fault_channel": "simulated_vibration_m_s2",
+    "experimental_validation": false
+  },
+  "fault_metadata": {
+    "label": "healthy",
+    "provenance": "simulated",
+    "parameter_name": "illustrative_4kW_400V_50Hz_4pole",
+    "parameter_provenance": "literature_example",
+    "scenario_name": "fault_04_bearing_outer_race_bpfo",
+    "park_convention": "krause_classical_2_3",
+    "solver": "RK45",
+    "max_step_s": 0.0001,
+    "rtol": 1e-06,
+    "atol": 1e-08,
+    "t_end_s": 1.0,
+    "output_dt_s": 0.0001,
+    "initial_condition": "rest",
+    "nfev": 60008,
+    "njev": 0,
+    "n_eval": 10001,
+    "message": "The solver successfully reached the end of the integration interval.",
+    "supply_frequency_hz": 50.0,
+    "load_type": "constant_torque",
+    "load_torque_nm": 15.0,
+    "stator_resistance_case": "healthy_balanced",
+    "stator_resistances_abc_ohm": [
+      1.405,
+      1.405,
+      1.405
+    ],
+    "supply_voltage_case": "balanced",
+    "supply_voltage_multipliers_abc": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "supply_phase_peak_abc_v": [
+      326.59863237109045,
+      326.59863237109045,
+      326.59863237109045
+    ],
+    "supply_unbalance": {
+      "enabled": false,
+      "label": "balanced",
+      "multipliers_abc": [
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "supply_fault": false,
+    "inverter": false,
+    "faults": false,
+    "rotor_asymmetry_case": "healthy_rotor",
+    "rotor_asymmetry_enabled": false,
+    "rotor_asymmetry_severity": 0.0,
+    "rotor_asymmetry_reference_slip": null,
+    "bearing_fault_case": "fault_04_outer_race_bpfo",
+    "bearing_fault_enabled": true,
+    "bearing_fault_channel": "simulated_vibration_m_s2",
+    "experimental_validation": false
+  },
+  "bearing_config": {
+    "enabled": true,
+    "nb_balls": 9,
+    "ball_diameter_m": 0.00794,
+    "pitch_diameter_m": 0.03904,
+    "contact_angle_deg": 0.0,
+    "resonance_hz": 2000.0,
+    "resonance_decay_s": 0.001,
+    "amplitude_m_s2": 1.0,
+    "label": "fault_04_outer_race_bpfo"
+  },
+  "metrics": {
+    "bpfo_hz": 87.49065692682353,
+    "shaft_hz_mean": 24.406111085553345,
+    "envelope_bpfo_healthy": 0.0,
+    "envelope_bpfo_fault": 0.15268396403300677,
+    "envelope_bpfo_2x_healthy": 0.0,
+    "envelope_bpfo_2x_fault": 0.09547199716897213,
+    "bpfo_peak_healthy_hz": 85.98280343931214,
+    "bpfo_peak_fault_hz": 87.5898115265055,
+    "envelope_bpfo_ratio": null
+  },
+  "electrical_traces_identical_to_healthy": true,
+  "healthy_power_balance_residual_rel": 9.442665079837727e-15,
+  "fault_power_balance_residual_rel": 9.442665079837727e-15,
+  "note": "Simulated outer-race bearing fault on a separate vibration channel at BPFO. Electrical motor model unchanged; simulation-only; not a confirmed real-machine diagnosis."
+}

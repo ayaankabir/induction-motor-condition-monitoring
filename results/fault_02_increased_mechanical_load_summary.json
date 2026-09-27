@@ -1,0 +1,139 @@
+{
+  "label": "simulated_fault_02_increased_mechanical_load_comparison",
+  "condition_kind": "operating_condition_change_not_internal_fault",
+  "parameter_provenance": "literature_example",
+  "healthy_metadata": {
+    "label": "healthy",
+    "provenance": "simulated",
+    "parameter_name": "illustrative_4kW_400V_50Hz_4pole",
+    "parameter_provenance": "literature_example",
+    "scenario_name": "healthy_50hz_constant_torque",
+    "park_convention": "krause_classical_2_3",
+    "solver": "RK45",
+    "max_step_s": 0.0001,
+    "rtol": 1e-06,
+    "atol": 1e-08,
+    "t_end_s": 1.0,
+    "output_dt_s": 0.0001,
+    "initial_condition": "rest",
+    "nfev": 60008,
+    "njev": 0,
+    "n_eval": 10001,
+    "message": "The solver successfully reached the end of the integration interval.",
+    "supply_frequency_hz": 50.0,
+    "load_type": "constant_torque",
+    "load_torque_nm": 15.0,
+    "stator_resistance_case": "healthy_balanced",
+    "stator_resistances_abc_ohm": [
+      1.405,
+      1.405,
+      1.405
+    ],
+    "supply_voltage_case": "balanced",
+    "supply_voltage_multipliers_abc": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "supply_phase_peak_abc_v": [
+      326.59863237109045,
+      326.59863237109045,
+      326.59863237109045
+    ],
+    "supply_unbalance": {
+      "enabled": false,
+      "label": "balanced",
+      "multipliers_abc": [
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "supply_fault": false,
+    "inverter": false,
+    "faults": false,
+    "rotor_asymmetry_case": "healthy_rotor",
+    "rotor_asymmetry_enabled": false,
+    "rotor_asymmetry_severity": 0.0,
+    "rotor_asymmetry_reference_slip": null,
+    "bearing_fault_case": "healthy_bearing",
+    "bearing_fault_enabled": false,
+    "bearing_fault_channel": "simulated_vibration_m_s2",
+    "experimental_validation": false
+  },
+  "condition_metadata": {
+    "label": "healthy",
+    "provenance": "simulated",
+    "parameter_name": "illustrative_4kW_400V_50Hz_4pole",
+    "parameter_provenance": "literature_example",
+    "scenario_name": "fault_02_increased_mechanical_load_plus_50pct",
+    "park_convention": "krause_classical_2_3",
+    "solver": "RK45",
+    "max_step_s": 0.0001,
+    "rtol": 1e-06,
+    "atol": 1e-08,
+    "t_end_s": 1.0,
+    "output_dt_s": 0.0001,
+    "initial_condition": "rest",
+    "nfev": 60008,
+    "njev": 0,
+    "n_eval": 10001,
+    "message": "The solver successfully reached the end of the integration interval.",
+    "supply_frequency_hz": 50.0,
+    "load_type": "constant_torque",
+    "load_torque_nm": 22.5,
+    "stator_resistance_case": "healthy_balanced",
+    "stator_resistances_abc_ohm": [
+      1.405,
+      1.405,
+      1.405
+    ],
+    "supply_voltage_case": "balanced",
+    "supply_voltage_multipliers_abc": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "supply_phase_peak_abc_v": [
+      326.59863237109045,
+      326.59863237109045,
+      326.59863237109045
+    ],
+    "supply_unbalance": {
+      "enabled": false,
+      "label": "balanced",
+      "multipliers_abc": [
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "supply_fault": false,
+    "inverter": false,
+    "faults": false,
+    "rotor_asymmetry_case": "healthy_rotor",
+    "rotor_asymmetry_enabled": false,
+    "rotor_asymmetry_severity": 0.0,
+    "rotor_asymmetry_reference_slip": null,
+    "bearing_fault_case": "healthy_bearing",
+    "bearing_fault_enabled": false,
+    "bearing_fault_channel": "simulated_vibration_m_s2",
+    "experimental_validation": false
+  },
+  "healthy_load_torque_nm": 15.0,
+  "condition_load_torque_nm": 22.5,
+  "load_increase_percent": 50.0,
+  "healthy_final_speed_rpm": 1464.366455498739,
+  "condition_final_speed_rpm": 1445.6118634338961,
+  "final_speed_difference_rpm": -18.754592064842882,
+  "healthy_final_slip": 0.023755696334173945,
+  "condition_final_slip": 0.03625875771073608,
+  "final_slip_difference": 0.012503061376562132,
+  "healthy_late_mean_torque_nm": 15.45774447393265,
+  "condition_late_mean_torque_nm": 22.951881904491103,
+  "healthy_late_mean_i_qs_a": 5.222821348625449,
+  "condition_late_mean_i_qs_a": 7.78244365674234,
+  "healthy_power_balance_residual_rel": 9.442665079837727e-15,
+  "condition_power_balance_residual_rel": 2.47910305410131e-14,
+  "note": "Controlled operating-condition change: 50% higher constant mechanical load torque (15.0 -> 22.5 N m). Simulation-only; not a confirmed internal motor fault and not experimental validation."
+}
