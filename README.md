@@ -141,6 +141,24 @@ streamlit run dashboard/app.py
 uvicorn api.main:app --reload
 ```
 
+### Production deployment
+
+Install the API and its runtime dependencies from the repository root:
+
+```bash
+python -m pip install .
+```
+
+Start the read-only API on a Python web host:
+
+```bash
+python -m uvicorn api.main:app --app-dir . --host 0.0.0.0 --port "$PORT"
+```
+
+Set `CORS_ALLOWED_ORIGINS` on the backend to a comma-separated list of exact frontend origins, for example `https://dashboard.example.com`. If it is unset or empty, only `http://localhost:3000` and `http://127.0.0.1:3000` are allowed.
+
+Set `NEXT_PUBLIC_API_BASE_URL` in the frontend deployment to the public backend origin, for example `https://api.example.com`; do not append `/api` because the frontend client adds API paths itself.
+
 ## Academic Use & Citations
 
 For coursework and research notes. Cite Krause, Ong, and MCSA survey literature. Do not copy restricted datasets into `data/` without provenance.

@@ -1,5 +1,6 @@
-from pathlib import Path
 import json
+import os
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
@@ -10,6 +11,18 @@ from imcm.reporting.explanation import generate_explanation
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 RESULTS_DIR = PROJECT_ROOT / "results"
+
+DEFAULT_CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+
+
+def get_cors_allowed_origins() -> list[str]:
+    configured_origins = os.getenv("CORS_ALLOWED_ORIGINS", "")
+    origins = [origin.strip() for origin in configured_origins.split(",") if origin.strip()]
+
+    return origins or DEFAULT_CORS_ALLOWED_ORIGINS
 
 
 CONDITION_FILES = {
@@ -35,11 +48,8 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-    ],
-    allow_credentials=True,
+    allow_origins=get_cors_allowed_origins(),
+    allow_credentials=False,
     allow_methods=["GET"],
     allow_headers=["*"],
 )
