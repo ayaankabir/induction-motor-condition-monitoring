@@ -11,7 +11,10 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-# Graceful sklearn import
+# Graceful sklearn import — allow the package to load even when sklearn is absent,
+# so that imcm.ml can be imported and run_exploratory_training is available at
+# runtime; consumers should check SKLEARN_AVAILABLE before calling sklearn-dep
+# functionality.
 try:
     from sklearn.ensemble import RandomForestClassifier
     from sklearn.metrics import (
@@ -33,6 +36,8 @@ except ImportError as e:
     RandomForestClassifier = None
     accuracy_score = classification_report = confusion_matrix = f1_score = precision_recall_fscore_support = None
     LeaveOneGroupOut = None
+    # Ensure names used later in the file are still defined as no-ops
+    RandomForestClassifier = lambda *a, **k: None  # type: ignore[assignment,misc]
     LabelEncoder = StandardScaler = compute_class_weight = None
     permutation_importance = None
 
