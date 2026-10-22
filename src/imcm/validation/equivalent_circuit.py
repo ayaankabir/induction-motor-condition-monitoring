@@ -29,7 +29,12 @@ def equivalent_circuit_point(
     line_line_rms_v: float,
     frequency_hz: float,
 ) -> EquivalentCircuitPoint:
-    """IEEE T-circuit at one slip. Rotor branch uses \(R_r/s\)."""
+    """IEEE T-circuit at one slip. Rotor branch uses \\(R_r/s\\).
+
+    Uses the IEEE phasor notation with LaTeX-style backslash-parenthesis for
+    the rotor resistance slip term. The double-backslash escapes the literal
+    backslash in the Python docstring string.
+    """
     if abs(slip) < 1.0e-12:
         raise ValueError("slip too small for R_r/s branch")
     omega_e = 2.0 * pi * frequency_hz
