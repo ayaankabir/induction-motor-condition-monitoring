@@ -1,0 +1,5 @@
+# ML Dependencies for IMCM V2.3
+# Install with: pip install --user -r requirements-ml.txt
+scikit-learn>=1.5
+joblib>=1.4
+shap>=0.45

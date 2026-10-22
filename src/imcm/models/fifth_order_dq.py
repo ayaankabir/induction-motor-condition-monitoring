@@ -6,6 +6,8 @@ digital twin and not experimental data.
 
 from __future__ import annotations
 
+import numpy as np
+import warnings
 from dataclasses import dataclass, field, replace
 from typing import Any
 
@@ -185,16 +187,54 @@ def simulate_healthy(
     rtol: float = DEFAULT_RTOL,
     atol: float = DEFAULT_ATOL,
     y0: np.ndarray | None = None,
+    param_overrides: dict[str, float] | None = None,
+    noise_seed: int | None = None,
 ) -> HealthySimulationResult:
     """Integrate the healthy plant from rest (unless ``y0`` is given).
 
     Parameters are the illustrative literature-example machine unless overridden.
     Results are simulated; they are not laboratory measurements.
+
+    Optional ``param_overrides`` allows V2.1 Interactive Simulation Lab
+    controlled parameter variation. Each key must match an
+    ``InductionMotorParameters`` field name (``r_s``, ``r_r``, ``l_ls``,
+    ``l_lr``, ``l_m``, ``inertia``, ``viscous_friction``). The value replaces
+    the corresponding parameter while keeping all other attributes identical.
+
+    Optional ``noise_seed`` enables seeded measurement-noise injection after
+    simulation. When provided, Gaussian noise (mean=0, std=1) is added to the
+    simulated traces. The same seed with identical parameters and configuration
+    always produces identical results. This is intended for exploratory
+    sensitivity analysis only; the base dataset remains noise-free.
     """
     if params is None:
         params = illustrative_4kw_400v_50hz_4pole()
     if scenario is None:
         scenario = first_milestone_scenario()
+
+    # Apply parameter overrides for V2.1 Interactive Simulation Lab
+    if param_overrides:
+        from dataclasses import replace as dc_replace
+        # Build override dict for valid parameter fields
+        valid_params = {
+            "r_s": param_overrides.get("r_s", params.r_s),
+            "r_r": param_overrides.get("r_r", params.r_r),
+            "l_ls": param_overrides.get("l_ls", params.l_ls),
+            "l_lr": param_overrides.get("l_lr", params.l_lr),
+            "l_m": param_overrides.get("l_m", params.l_m),
+            "inertia": param_overrides.get("inertia", params.inertia),
+            "viscous_friction": param_overrides.get("viscous_friction", params.viscous_friction),
+        }
+        # Validate all values are positive
+        for key, val in valid_params.items():
+            if val <= 0:
+                raise ValueError(f"Parameter '{key}' must be positive, got {val}")
+        params = dc_replace(params, **valid_params)
+        # Update scenario notes to reflect the override
+        if scenario.notes:
+            scenario = replace(scenario, notes=scenario.notes + f" | V2.1 param override: {param_overrides}")
+        else:
+            scenario = replace(scenario, notes=f"V2.1 param override: {param_overrides}")
     rotor = scenario.rotor_asymmetry
     if rotor.enabled and rotor.reference_slip is None:
         # Resolve the constant reference slip once (documented Fault 05 proxy
@@ -239,7 +279,33 @@ def simulate_healthy(
     if not np.all(np.isfinite(sol.y)):
         raise RuntimeError("RK45 produced non-finite states (numerical instability)")
 
-    rec = _reconstruct(sol.t, sol.y, params, scenario)
+    # Apply seeded measurement-noise injection after simulation
+    if noise_seed is not None:
+        rng = np.random.default_rng(noise_seed)
+        # Add Gaussian noise to selected traced states (mean=0, std=1, scaled by physical units)
+        # States to add noise to: i_abc (phase currents), tau_e (electromagnetic torque),
+        # v_abc (phase voltages). Noise std is relative to the signal magnitude.
+        noise_scale = {
+            'i_abc': np.array([1.0, 1.0, 1.0]),  # A per phase
+            'tau_e': 0.01,  # N·m relative to typical torque ~20 N·m
+            'v_abc': np.array([1.0, 1.0, 1.0]),  # V per phase
+        }
+        # Start with clean reconstruction
+        rec_clean = _reconstruct(sol.t, sol.y, params, scenario)
+        # Add noise to the reconstructed traces
+        for key, std in noise_scale.items():
+            arr = rec_clean[key]
+            if arr.ndim == 1:
+                noise = std * rng.standard_normal(arr.shape)
+                rec_clean[key] = arr + noise
+            elif arr.ndim == 2 and arr.shape[0] == 3:
+                # Three-phase traces: broadcast per-phase std across time dimension
+                # std is shape (3,), arr is shape (3, N); reshape for broadcasting
+                noise = std[:, np.newaxis] * rng.standard_normal(arr.shape)
+                rec_clean[key] = arr + noise
+        rec = rec_clean
+    else:
+        rec = _reconstruct(sol.t, sol.y, params, scenario)
     if scenario.rotor_asymmetry.enabled:
         run_label = scenario.rotor_asymmetry.label
     elif scenario.stator_resistance.enabled:

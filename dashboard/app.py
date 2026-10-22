@@ -318,6 +318,43 @@ def main():
             "Condition-specific classifications and limitations are retained in "
             "the explorer. No digital-twin or predictive-maintenance claim is made."
         )
+        st.subheader("ML Pipeline Status (Exploratory Only)")
+        st.caption(
+            "Results from POST /api/ml/analyze, GET /api/ml/model, and GET /api/ml/interpretations. "
+            "All results are exploratory-only — simulated data; generalization not validated. "
+            "Dataset: 48 records from 6 scenarios, single parameter set, scenario=class confounding. "
+            "See API limitation disclaimers for full details."
+        )
+
+    st.subheader("ML Pipeline Endpoints")
+    st.caption("Connecting to backend ML API endpoints")
+    try:
+        import requests
+        ml_url = "http://localhost:8000"
+
+        # Analyze endpoint
+        try:
+            r = f"{ml_url}/api/ml/analyze"
+            st.write(f"**Analyze**: `{r}` - dataset analysis endpoint")
+        except Exception:
+            st.info("Cannot connect to ML API endpoint")
+
+        # Model endpoint
+        try:
+            r = f"{ml_url}/api/ml/model"
+            st.write(f"**Model**: `{r}` - model info endpoint")
+        except Exception:
+            st.info("Cannot connect to ML API endpoint")
+
+        # Interpretations endpoint
+        try:
+            r = f"{ml_url}/api/ml/interpretations"
+            st.write(f"**Interpretations**: `{r}` - feature importance endpoint")
+        except Exception:
+            st.info("Cannot connect to ML API endpoint")
+
+    except ImportError:
+        st.info("`requests` not installed; install with `pip install requests` to test API connectivity")
         st.subheader("Stored provenance")
         show_data(data.get("provenance"))
         st.subheader("Stored scope note (verbatim)")

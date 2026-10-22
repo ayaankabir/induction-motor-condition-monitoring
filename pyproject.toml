@@ -22,6 +22,11 @@ dev = [
   "pytest>=8.0",
   "httpx>=0.27",
 ]
+ml = [
+  "scikit-learn>=1.5",
+  "joblib>=1.4",
+  "shap>=0.45",
+]
 
 [project.scripts]
 imcm-report = "imcm.reporting.generate_report:main"
