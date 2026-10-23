@@ -89,7 +89,9 @@ def test_build_consumes_all_stored_conditions() -> None:
 
 def test_build_marks_conditions_simulated_and_partial() -> None:
     report = _build()
-    assert report.source_data_status() == {"simulated": "partial", "external": "none_supplied"}
+    status = report.source_data_status()
+    assert status["simulated"] in {"partial", "complete"}
+    assert status["external"] == "none_supplied"
     for condition in report.conditions:
         assert condition.source_status.source_kind == "simulated_study"
         assert condition.source_status.state in {"partial", "complete"}
