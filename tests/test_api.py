@@ -75,3 +75,38 @@ def test_get_invalid_condition_returns_404(client: TestClient) -> None:
     assert response.status_code == 404
     detail = response.json()["detail"]
     assert "Unknown condition ID" in detail
+
+
+def test_simulate_endpoint_healthy(client: TestClient) -> None:
+    """Regression test for /api/simulate returning 200 with valid simulation outputs."""
+    response = client.get(
+        "/api/simulate?scenario_name=healthy&t_end=0.05&max_step=0.0001&output_dt=0.0001&rtol=0.000001&atol=1e-8"
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["scenario_name"] == "healthy_50hz_constant_torque"
+    assert data["t_end_s"] == 0.05
+    assert "outputs" in data
+    outputs = data["outputs"]
+    assert "three_phase_currents_a" in outputs
+    assert len(outputs["three_phase_currents_a"]) > 0
+    first_pt = outputs["three_phase_currents_a"][0]
+    assert "time_s" in first_pt
+    assert "current_a" in first_pt
+    assert "metadata" in data
+    assert data["metadata"]["provenance"] == "simulated"
+    assert data["metadata"]["experimental_validation"] is False
+
+
+def test_simulate_endpoint_mqtt_streaming(client: TestClient) -> None:
+    """Regression test for /api/simulate with mqtt_enabled=true."""
+    response = client.get(
+        "/api/simulate?scenario_name=healthy&t_end=0.02&mqtt_enabled=true&mqtt_chunk_size=50"
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "mqtt_streaming_report" in data
+    report = data["mqtt_streaming_report"]
+    assert "current_a" in report
+    assert report["current_a"]["total_packets_received"] > 0
+    assert report["current_a"]["duplicate_count"] == 0

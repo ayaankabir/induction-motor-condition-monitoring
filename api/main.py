@@ -121,8 +121,8 @@ def simulate(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Simulation failed: {e}")
 
-    three_phase = result.v_abc
-    qd0 = result.i_abc
+    three_phase = result.i_abc
+    qd0 = [result.i_qs, result.i_ds]
 
     metadata = dict(result.metadata)
     metadata["provenance"] = "simulated"
@@ -136,17 +136,35 @@ def simulate(
         "current_a": result.i_abc[0],
         "current_b": result.i_abc[1],
         "current_c": result.i_abc[2],
-        "i_qs": qd0[0],
-        "i_ds": qd0[1],
+        "i_qs": result.i_qs,
+        "i_ds": result.i_ds,
         "omega_m": result.omega_m,
         "tau_e": result.tau_e,
         "lambda_qs": result.lambda_qs,
         "lambda_ds": result.lambda_ds,
     }
-    units_dict = {k: "A" for k in channels_dict}
-    signal_types_dict = {"current_a": "current", "current_b": "current", "current_c": "current"}
-    for k in ["i_qs", "i_ds", "omega_m", "tau_e", "lambda_qs", "lambda_ds"]:
-        signal_types_dict[k] = "derived"
+    units_dict = {
+        "current_a": "A",
+        "current_b": "A",
+        "current_c": "A",
+        "i_qs": "A",
+        "i_ds": "A",
+        "omega_m": "rad/s",
+        "tau_e": "N*m",
+        "lambda_qs": "dimensionless",
+        "lambda_ds": "dimensionless",
+    }
+    signal_types_dict = {
+        "current_a": "current",
+        "current_b": "current",
+        "current_c": "current",
+        "i_qs": "current",
+        "i_ds": "current",
+        "omega_m": "speed",
+        "tau_e": "torque",
+        "lambda_qs": "other",
+        "lambda_ds": "other",
+    }
 
     fs = 1.0 / (result.t[1] - result.t[0]) if len(result.t) > 1 else 10000.0
     trace = SignalTrace.from_arrays(
