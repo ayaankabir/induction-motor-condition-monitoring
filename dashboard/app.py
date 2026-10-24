@@ -326,35 +326,15 @@ def main():
             "See API limitation disclaimers for full details."
         )
 
-    st.subheader("ML Pipeline Endpoints")
-    st.caption("Connecting to backend ML API endpoints")
-    try:
-        import requests
+        st.subheader("ML Pipeline API Reference")
+        st.caption("Backend ML endpoints exposed by the FastAPI service (read-only reference):")
         ml_url = "http://localhost:8000"
+        st.markdown(
+            f"- **Analyze**: `{ml_url}/api/ml/analyze` (POST — dataset analysis)\n"
+            f"- **Model**: `{ml_url}/api/ml/model` (GET — trained model summary)\n"
+            f"- **Interpretations**: `{ml_url}/api/ml/interpretations` (GET — feature importance)"
+        )
 
-        # Analyze endpoint
-        try:
-            r = f"{ml_url}/api/ml/analyze"
-            st.write(f"**Analyze**: `{r}` - dataset analysis endpoint")
-        except Exception:
-            st.info("Cannot connect to ML API endpoint")
-
-        # Model endpoint
-        try:
-            r = f"{ml_url}/api/ml/model"
-            st.write(f"**Model**: `{r}` - model info endpoint")
-        except Exception:
-            st.info("Cannot connect to ML API endpoint")
-
-        # Interpretations endpoint
-        try:
-            r = f"{ml_url}/api/ml/interpretations"
-            st.write(f"**Interpretations**: `{r}` - feature importance endpoint")
-        except Exception:
-            st.info("Cannot connect to ML API endpoint")
-
-    except ImportError:
-        st.info("`requests` not installed; install with `pip install requests` to test API connectivity")
         st.subheader("Stored provenance")
         show_data(data.get("provenance"))
         st.subheader("Stored scope note (verbatim)")

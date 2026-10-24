@@ -20,8 +20,5 @@ jobs:
       - name: Install project and development dependencies
         run: python -m pip install -e ".[dev]"
 
-      - name: Generate simulation artifacts (overview figure for engineering report test)
-        run: python experiments/run_fault_overview.py
-
       - name: Run tests
         run: python -m pytest tests/

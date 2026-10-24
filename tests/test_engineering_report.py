@@ -98,6 +98,34 @@ def test_build_marks_conditions_simulated_and_partial() -> None:
         assert condition.provenance.parameter_source == "literature_example"
 
 
+def test_build_marks_conditions_simulated_partial_without_figures(tmp_path: Path) -> None:
+    """With summary files but missing figures, conditions should be partial."""
+    # Copy only the summary/provenance JSONs (no PNG figures) to temp dir
+    import shutil
+    temp_results = tmp_path / "results"
+    temp_results.mkdir(parents=True)
+    for src in RESULTS_DIR.glob("*_summary.json"):
+        shutil.copy2(src, temp_results / src.name)
+    for src in RESULTS_DIR.glob("*_provenance.json"):
+        shutil.copy2(src, temp_results / src.name)
+    for src in RESULTS_DIR.glob("*_run_config.json"):
+        shutil.copy2(src, temp_results / src.name)
+    # Copy the overview
+    shutil.copy2(RESULTS_DIR / "fault_overview_summary.json", temp_results / "fault_overview_summary.json")
+    shutil.copy2(RESULTS_DIR / "fault_overview_table.md", temp_results / "fault_overview_table.md")
+    # Do NOT copy any .png files
+
+    report = build_engineering_report(temp_results, generated_at_utc=FIXED_TIME)
+    status = report.source_data_status()
+    assert status["simulated"] == "partial"
+    assert status["external"] == "none_supplied"
+    for condition in report.conditions:
+        assert condition.source_status.source_kind == "simulated_study"
+        assert condition.source_status.state == "partial"
+        assert condition.provenance.parameter_source == "literature_example"
+        assert condition.source_status.missing_files  # Figures are missing
+
+
 def test_build_never_loads_waveform_archives() -> None:
     report = _build()
     # The builder must reference only presentation-safe artifacts; it never
@@ -196,8 +224,57 @@ def test_html_is_self_contained_and_flags_simulated_data() -> None:
     html = render_html(_build())
     assert html.startswith("<!doctype html>")
     assert "SIMULATED STUDY DATA" in html
-    assert "data:image/png;base64," in html
     assert "EngineeringReport" not in html
+
+
+def test_html_embeds_raster_figures_as_base64_data_uris(tmp_path: Path) -> None:
+    """Validate that available raster figures are embedded as base64 data URIs."""
+    import shutil
+    temp_results = tmp_path / "results"
+    temp_results.mkdir(parents=True)
+    for src in RESULTS_DIR.glob("*_summary.json"):
+        shutil.copy2(src, temp_results / src.name)
+    for src in RESULTS_DIR.glob("*_provenance.json"):
+        shutil.copy2(src, temp_results / src.name)
+    for src in RESULTS_DIR.glob("*_run_config.json"):
+        shutil.copy2(src, temp_results / src.name)
+    shutil.copy2(RESULTS_DIR / "fault_overview_summary.json", temp_results / "fault_overview_summary.json")
+    shutil.copy2(RESULTS_DIR / "fault_overview_table.md", temp_results / "fault_overview_table.md")
+
+    # Minimal valid PNG fixture to test base64 embedding deterministically
+    valid_png = (
+        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x07\x00\x00\x00\x07"
+        b"\x08\x06\x00\x00\x00\xc4RW\xd3\x00\x00\x00:tEXtSoftware\x00Matplotlib "
+        b"version3.11.2, https://matplotlib.org/\x80\x8d\xee\x00\x00\x00\x00\tpHYs"
+        b"\x00\x00\x0fa\x00\x00\x0fa\x01\xa8?\xa7i\x00\x00\x00\x16IDATx\x9cc\xfc"
+        b"\xff\xff\xff\x7f\x06\x1c\x80\t\x97\xc4\xa0\x94\x04\x00%c\x04\n\nX\\\xa1"
+        b"\x00\x00\x00\x00IEND\xaeB`\x82"
+    )
+    (temp_results / "fault_overview_comparison.png").write_bytes(valid_png)
+
+    report = build_engineering_report(temp_results, generated_at_utc=FIXED_TIME)
+    html = render_html(report)
+    assert "data:image/png;base64," in html
+    assert '<img src="data:image/png;base64,' in html
+
+
+def test_html_reports_missing_figure_when_absent(tmp_path: Path) -> None:
+    """When a figure is referenced but absent on disk, a missing figure notice is rendered."""
+    import shutil
+    temp_results = tmp_path / "results"
+    temp_results.mkdir(parents=True)
+    for src in RESULTS_DIR.glob("*_summary.json"):
+        shutil.copy2(src, temp_results / src.name)
+    for src in RESULTS_DIR.glob("*_provenance.json"):
+        shutil.copy2(src, temp_results / src.name)
+    for src in RESULTS_DIR.glob("*_run_config.json"):
+        shutil.copy2(src, temp_results / src.name)
+    shutil.copy2(RESULTS_DIR / "fault_overview_summary.json", temp_results / "fault_overview_summary.json")
+    shutil.copy2(RESULTS_DIR / "fault_overview_table.md", temp_results / "fault_overview_table.md")
+
+    report = build_engineering_report(temp_results, generated_at_utc=FIXED_TIME)
+    html = render_html(report)
+    assert 'class="missing"' in html
 
 
 def test_html_escapes_external_source_names() -> None:
