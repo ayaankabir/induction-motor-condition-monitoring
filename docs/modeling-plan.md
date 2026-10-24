@@ -491,67 +491,43 @@ Do not implement fault ODEs until explicitly approved.
 
 ## 16. v2 ML research prototype (simulated data only)
 
-Status: **Implemented** — dataset construction script added to `src/imcm/processing/construct_dataset.py`.
+Status: **Implemented as an exploratory prototype.** Dataset construction,
+readiness analysis, Random Forest pipeline, evaluation helpers, and interpretation
+helpers exist in `src/imcm/processing/construct_dataset.py`, `src/imcm/ml/`, and
+`src/imcm/evaluation/`. This is not validated diagnostic software.
 
-**What was done:**
-- Extracted electrical MCSA features from all 6 IMCM simulated result files
-  (healthy_startup + fault_01 through fault_05), producing a labeled CSV
-  (`labeled_dataset.csv`) with 6 records and 18 feature columns.
-- All features are electrically motivated MCSA metrics (negative-sequence current,
-  current unbalance %, dq-current magnitudes, FFT spectral peak near 50 Hz,
-  torque ripple, rotor asymmetry sidebands, bearing envelope).
-- Features are computed in the late-simulation window where applicable; FFT
-  windows use Hanning tapering.
-- Provenance is always ``provenance=simulated``; every output row carries this
-  tag.
+The dataset constructor extracts electrical and auxiliary features including
+negative-sequence current, current unbalance, dq-current magnitudes, spectral
+peaks, torque ripple, rotor-asymmetry sidebands, and bearing-envelope measures.
+It tags every row `provenance=simulated` and writes `labeled_dataset.csv` at the
+repository root. The module exposes a `main()` function but has no executable
+module entry point or installed console command. The README documents a direct
+Python invocation. The generator writes the root-level output file when called;
+preserve any existing copy before running it.
+Dataset size and feature values depend on available simulated result archives and
+generator configuration, so this section does not treat a prior generated CSV
+snapshot as a fixed project artifact.
 
-**Feature summary per scenario:**
+The implementation uses a single illustrative motor parameter basis with
+selected operating and fault parameter variations. Scenario and class remain
+confounded, and the small six-scenario design does not establish performance on
+unseen scenarios. Short simulation windows limit frequency resolution for some
+spectral features. Any reported training-set metrics are not independent
+validation and must not be presented as generalization evidence. No experimental
+measurements, physical-motor validation, or industrial accuracy claims are
+supported.
 
-| Label | npts | t_end_s | neg_seq (A) | unbalance (%) | dq_i_qs_rms | dq_i_ds_rms | spec_peak_hz | spec_peak_amp | torque_ripple_rms_nm | bearing_peak_m_s2 |
-|-------|------|---------|-------------|---------------|-------------|-------------|--------------|---------------|----------------------|-------------------|
-| healthy | 10001 | 1.0 | 3.94 | 7.10 | 10.05 | 10.16 | 49.98 | 3935.25 | 21.65 | NaN |
-| fault_01 | 10001 | 1.0 | 3.94 | 7.10 | 10.05 | 10.16 | 49.98 | 3935.25 | 21.65 | NaN |
-| fault_02 | 10001 | 1.0 | 3.94 | 7.10 | 10.05 | 10.16 | 49.98 | 3935.25 | 21.65 | NaN |
-| fault_03 | 10001 | 1.0 | 3.94 | 7.10 | 10.05 | 10.16 | 49.98 | 3935.25 | 21.65 | NaN |
-| fault_04 | 10001 | 1.0 | 3.94 | 7.10 | NaN | NaN | 49.98 | 3935.25 | NaN | 0.0 |
-| fault_05 | 30001 | 3.0 | 3.94 | 4.42 | 7.20 | 7.59 | 50.00 | 43287.72 | 17.77 | NaN |
-
-**Key observations:**
-- fault_04 is the only scenario with a non-NaN bearing envelope peak (simulated BPFO
-  impulse train at 2 kHz resonance).
-- fault_05 has 3× more time points (30001 vs 10001), giving adequate frequency
-  resolution for sideband detection at f_s(1±2s); other faults have limited resolution.
-- fault_01–03 are electrically very similar (stator resistance imbalance and supply
-  unbalance produce nearly identical electrical signatures in this reduced-order model).
-- The "healthy" and "fault_01" rows are identical because the first-milestone model
-  has balanced stator resistances by default; fault_01's +10% phase-A resistance
-  change is too small to produce a distinguishable current unbalance in this regime.
-
-**Downstream use:**
-- The CSV can be loaded with `pandas.read_csv` and used for exploratory feature
-  analysis only.
-- Any classifier trained on this data must be qualified with the explicit
-  disclaimer: *"Results are on simulated data only (RK45 integration of a
-  fifth-order induction motor model). No laboratory measurements or experimental
-  validation are made. Classifier performance does not extrapolate to real motors."*
-- A meaningful multi-class classifier from 6 samples is not feasible without
-  parameter leakage; any evaluation must use scenario-stratified split (here,
-  each scenario is a single sample, so even stratified split degenerates to
-  "leave-one-out" with zero training data — see §14.x of this plan).
-
-**Planned next steps (if user elects):**
-1. Generate additional simulation runs varying parameters (load torque, supply
-   voltage, speed) to build a more realistic multi-sample dataset.
-2. Implement a baseline classifier (e.g., softmax regression or RandomForest)
-   with macro-F1 and per-class precision/recall, always qualified with the
-   "simulated data only" disclaimer.
-3. Add §14.x item documenting the ML prototype status and limitations.
+The API's `/api/ml/analyze` route inspects the root-level CSV and returns 404 if
+it is absent; `/api/ml/model` reports configuration/readiness, and
+`/api/ml/interpretations` reports interpretation availability. There is no API
+model-training route. The Python pipeline can be used for controlled exploratory
+work, with any split strategy and metrics described explicitly and interpreted
+within these limitations.
 
 **Citation / reference:**
 - Model: fifth-order dq induction motor (Krause convention), §4 of this plan.
-- Features: MCSA feature space as documented in `src/imcm/processing/features.py`.
-- Dataset: `labeled_dataset.csv`; construction script at
-  `src/imcm/processing/construct_dataset.py`.
-- Disclaimer text reproduced in this section.
+- Features: MCSA feature space documented in `src/imcm/processing/features.py`.
+- Dataset constructor: `src/imcm/processing/construct_dataset.py`.
+- API readiness inspection: `GET` or `POST /api/ml/analyze`.
 
 ---

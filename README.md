@@ -55,7 +55,10 @@ Scientific rules: [`AGENTS.md`](AGENTS.md).
 src/imcm/
 ├── analysis/     # Spectral analysis, FFT, and MCSA sideband extraction
 ├── data/         # Provenance schemas, trace containers, and CSV importer
+├── evaluation/  # Evaluation helpers for exploratory classifier workflows
 ├── faults/       # Fault catalog and Fault 04 bearing vibration proxy generator
+├── iot/          # MQTT message schemas and streaming helpers
+├── ml/           # Exploratory Random Forest pipeline and interpretation helpers
 ├── models/       # Parameters, Krause ODEs, flux maps, and fault modifications
 ├── processing/   # Envelope demodulation (Hilbert transform)
 ├── reporting/    # Engineering report generator, HTML/PDF renderers, triage, and provenance
@@ -83,6 +86,9 @@ Heavy simulation trace archives (`.npz`), plots (`.png`), and generated reports 
 
 ## Installation & Testing
 
+Requires Python 3.11 or newer. The optional `ml` extra installs the exploratory
+scikit-learn tooling; it does not make the classifier experimentally validated.
+
 ```bash
 # Optional: create and activate virtual environment
 python3 -m venv .venv
@@ -94,6 +100,30 @@ pip install -e ".[dev]"
 # Run test suite
 python -m pytest tests/
 ```
+
+The Next.js frontend is maintained separately; its checks and production build
+run from that frontend repository and are not part of this backend test command.
+
+## Dataset and ML prototype
+
+`src/imcm/processing/construct_dataset.py` constructs a labeled feature CSV from
+the simulated result archives and writes `labeled_dataset.csv` at the repository
+root. The generator exposes a `main()` function but has no executable module
+entry point or installed console command. After installing the package, invoke
+it with:
+
+```bash
+python -c 'from imcm.processing.construct_dataset import main; main()'
+```
+
+It writes the root-level CSV, so preserve any existing file before running it.
+The dataset is a small exploratory collection built on one illustrative motor
+parameter basis, with selected operating and fault parameter variations.
+Scenarios and labels are confounded, and short simulation windows
+limit frequency resolution for some spectral features. Training-set metrics are
+not independent validation; neither this prototype nor its metrics establish
+generalization to other motors, scenarios, or physical equipment. No experimental
+measurements or validation are included.
 
 ## Running Simulations
 
@@ -140,6 +170,24 @@ streamlit run dashboard/app.py
 # Launch local REST API service
 uvicorn api.main:app --reload
 ```
+
+The API currently exposes these routes (FastAPI's interactive schema is at
+`/docs` while the service is running):
+
+| Route | Purpose |
+| --- | --- |
+| `GET /api/health` | Read-only service and data-source status |
+| `GET /api/conditions` | List available condition summaries |
+| `GET /api/conditions/{condition_id}` | Return one condition summary |
+| `GET /api/simulate` | Run a selected simulation; optional MQTT streaming is supported |
+| `GET /api/simulate/limits` | Report simulation and streaming limits |
+| `GET` or `POST /api/ml/analyze` | Inspect root `labeled_dataset.csv` and report exploratory readiness; returns 404 when the file is absent |
+| `GET /api/ml/model` | Return model configuration and dependency readiness |
+| `GET /api/ml/interpretations` | Report interpretation capabilities and limitations |
+
+The ML routes expose dataset analysis, configuration, and interpretation status;
+they do not provide a model-training endpoint. The Python ML pipeline is a
+research prototype and its outputs must retain the limitations above.
 
 ### Production deployment
 
