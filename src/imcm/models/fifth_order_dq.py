@@ -38,6 +38,10 @@ DEFAULT_T_END_S = 1.0
 DEFAULT_OUTPUT_DT_S = 1.0e-4
 
 
+class SimulationWorkLimitExceeded(RuntimeError):
+    """Raised when an optional request-level RHS evaluation budget is exceeded."""
+
+
 @dataclass
 class HealthySimulationResult:
     """Time-domain traces from the healthy fifth-order model.
@@ -189,6 +193,7 @@ def simulate_healthy(
     y0: np.ndarray | None = None,
     param_overrides: dict[str, float] | None = None,
     noise_seed: int | None = None,
+    max_rhs_evaluations: int | None = None,
 ) -> HealthySimulationResult:
     """Integrate the healthy plant from rest (unless ``y0`` is given).
 
@@ -252,6 +257,8 @@ def simulate_healthy(
         raise ValueError("t_end must be positive")
     if max_step <= 0.0 or output_dt <= 0.0:
         raise ValueError("max_step and output_dt must be positive")
+    if max_rhs_evaluations is not None and max_rhs_evaluations <= 0:
+        raise ValueError("max_rhs_evaluations must be positive when provided")
 
     y0_vec = rest_initial_state() if y0 is None else np.asarray(y0, dtype=float)
     if y0_vec.shape != (5,):
@@ -260,7 +267,15 @@ def simulate_healthy(
     n_out = int(np.floor(t_end / output_dt)) + 1
     t_eval = np.linspace(0.0, t_end, n_out)
 
+    rhs_evaluations = 0
+
     def fun(t: float, x: np.ndarray) -> np.ndarray:
+        nonlocal rhs_evaluations
+        rhs_evaluations += 1
+        if max_rhs_evaluations is not None and rhs_evaluations > max_rhs_evaluations:
+            raise SimulationWorkLimitExceeded(
+                "Simulation exceeded its configured RHS evaluation budget"
+            )
         return healthy_state_derivative(t, x, params, scenario)
 
     sol = solve_ivp(

@@ -1,15 +1,25 @@
 import json
+import logging
+import math
 import os
+import threading
 from dataclasses import dataclass, field
+from decimal import Decimal, ROUND_CEILING, ROUND_FLOOR
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from imcm.ml import run_exploratory_training, SKLEARN_AVAILABLE
 from imcm.reporting.explanation import generate_explanation
-from imcm.models.fifth_order_dq import simulate_healthy, illustrative_4kw_400v_50hz_4pole, CONVENTION_NAME
+from imcm.models.fifth_order_dq import (
+    SimulationWorkLimitExceeded,
+    simulate_healthy,
+    illustrative_4kw_400v_50hz_4pole,
+    CONVENTION_NAME,
+)
 from imcm.models.operating_scenario import (
     first_milestone_scenario,
     fault_01_phase_a_resistance_imbalance_scenario,
@@ -23,19 +33,26 @@ from imcm.reporting.provenance import ALLOWED_DATASET_LABELS
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 RESULTS_DIR = PROJECT_ROOT / "results"
+logger = logging.getLogger(__name__)
 
 
 DEFAULT_CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "https://motor-simulation-data-comparison.vercel.app",
 ]
+
+LABELED_DATASET_PATH = PROJECT_ROOT / "labeled_dataset.csv"
 
 
 def get_cors_allowed_origins() -> list[str]:
     configured_origins = os.getenv("CORS_ALLOWED_ORIGINS", "")
     origins = [origin.strip() for origin in configured_origins.split(",") if origin.strip()]
+    if not origins:
+        return DEFAULT_CORS_ALLOWED_ORIGINS.copy()
 
-    return origins or DEFAULT_CORS_ALLOWED_ORIGINS
+    # Retain configured origins and always include the production dashboard.
+    return list(dict.fromkeys([*origins, DEFAULT_CORS_ALLOWED_ORIGINS[-1]]))
 
 
 CONDITION_FILES = {
@@ -47,6 +64,169 @@ CONDITION_FILES = {
     "fault-05": "fault_05_rotor_asymmetry_summary.json",
 }
 
+SUPPORTED_PARAM_OVERRIDE_KEYS = (
+    "r_s",
+    "r_r",
+    "l_ls",
+    "l_lr",
+    "l_m",
+    "inertia",
+    "viscous_friction",
+)
+
+SIMULATION_NUMERIC_LIMITS = {
+    "t_end": (0.1, 60.0),
+    "max_step": (1.0e-6, 1.0),
+    "output_dt": (1.0e-6, 1.0),
+    "rtol": (1.0e-12, 1.0),
+    "atol": (1.0e-12, 1.0),
+}
+
+# Public-request resource policies. These are engineering safeguards, not
+# physical limits; expose them through /api/simulate/limits and the README.
+MAX_SIMULATION_OUTPUT_SAMPLES = 12_000
+MAX_ESTIMATED_SOLVER_STEPS = 100_000
+MAX_SIMULATION_RHS_EVALUATIONS = 100_000
+MAX_SIMULATION_QUERY_BYTES = 4_096
+MAX_CONCURRENT_SIMULATIONS_PER_PROCESS = 1
+_SIMULATION_SEMAPHORE = threading.BoundedSemaphore(MAX_CONCURRENT_SIMULATIONS_PER_PROCESS)
+
+
+def _validate_simulation_parameters(
+    *,
+    t_end: float,
+    max_step: float,
+    output_dt: float,
+    rtol: float,
+    atol: float,
+    noise_seed: int | None,
+    mqtt_chunk_size: int,
+) -> None:
+    values = {
+        "t_end": t_end,
+        "max_step": max_step,
+        "output_dt": output_dt,
+        "rtol": rtol,
+        "atol": atol,
+    }
+    for name, value in values.items():
+        minimum, maximum = SIMULATION_NUMERIC_LIMITS[name]
+        if not math.isfinite(value) or not minimum <= value <= maximum:
+            raise HTTPException(
+                status_code=422,
+                detail=f"{name} must be finite and between {minimum:g} and {maximum:g}.",
+            )
+
+    if noise_seed is not None and noise_seed < 0:
+        raise HTTPException(status_code=422, detail="noise_seed must be a non-negative integer.")
+
+    if not 10 <= mqtt_chunk_size <= 10_000:
+        raise HTTPException(
+            status_code=422,
+            detail="mqtt_chunk_size must be between 10 and 10000.",
+        )
+
+
+def _validate_simulation_work_budget(*, t_end: float, max_step: float, output_dt: float) -> None:
+    output_ratio = Decimal(str(t_end)) / Decimal(str(output_dt))
+    output_samples = int(output_ratio.to_integral_value(rounding=ROUND_FLOOR)) + 1
+    if output_samples > MAX_SIMULATION_OUTPUT_SAMPLES:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "Requested output exceeds the maximum of "
+                f"{MAX_SIMULATION_OUTPUT_SAMPLES} samples; increase output_dt or reduce t_end."
+            ),
+        )
+
+    solver_ratio = Decimal(str(t_end)) / Decimal(str(max_step))
+    estimated_solver_steps = int(solver_ratio.to_integral_value(rounding=ROUND_CEILING))
+    if estimated_solver_steps > MAX_ESTIMATED_SOLVER_STEPS:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "Requested simulation exceeds the estimated solver-step budget of "
+                f"{MAX_ESTIMATED_SOLVER_STEPS}; increase max_step or reduce t_end."
+            ),
+        )
+
+
+def _validate_simulation_request(
+    *,
+    t_end: float,
+    max_step: float,
+    output_dt: float,
+    rtol: float,
+    atol: float,
+    noise_seed: int | None,
+    mqtt_chunk_size: int,
+) -> None:
+    _validate_simulation_parameters(
+        t_end=t_end,
+        max_step=max_step,
+        output_dt=output_dt,
+        rtol=rtol,
+        atol=atol,
+        noise_seed=noise_seed,
+        mqtt_chunk_size=mqtt_chunk_size,
+    )
+    _validate_simulation_work_budget(
+        t_end=t_end,
+        max_step=max_step,
+        output_dt=output_dt,
+    )
+
+
+def _reject_nonstandard_json_constant(value: str) -> None:
+    raise ValueError(f"Non-finite JSON number {value} is not allowed")
+
+
+def _parse_param_overrides(raw_value: str | None) -> dict[str, float] | None:
+    """Parse and validate the frontend's URL-encoded JSON override object."""
+    if raw_value is None:
+        return None
+
+    try:
+        decoded = json.loads(raw_value, parse_constant=_reject_nonstandard_json_constant)
+    except (json.JSONDecodeError, ValueError):
+        raise HTTPException(
+            status_code=400,
+            detail="param_overrides must be a valid JSON object containing finite numbers.",
+        ) from None
+
+    if not isinstance(decoded, dict):
+        raise HTTPException(
+            status_code=422,
+            detail="param_overrides must decode to a JSON object.",
+        )
+
+    unsupported_keys = sorted(set(decoded) - set(SUPPORTED_PARAM_OVERRIDE_KEYS))
+    if unsupported_keys:
+        raise HTTPException(
+            status_code=422,
+            detail="Unsupported parameter override name(s): " + ", ".join(unsupported_keys),
+        )
+
+    validated: dict[str, float] = {}
+    for key, value in decoded.items():
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise HTTPException(
+                status_code=422,
+                detail=f"Parameter override '{key}' must be a finite number greater than zero.",
+            )
+        try:
+            numeric_value = float(value)
+        except OverflowError:
+            numeric_value = math.inf
+        if not math.isfinite(numeric_value) or numeric_value <= 0:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Parameter override '{key}' must be a finite number greater than zero.",
+            )
+        validated[key] = numeric_value
+
+    return validated
+
 
 app = FastAPI(
     title="Induction Motor Condition Monitoring API",
@@ -57,6 +237,26 @@ app = FastAPI(
     ),
     version="1.0.0",
 )
+
+
+@app.middleware("http")
+async def guard_simulation_requests(request: Request, call_next):
+    if request.url.path == "/api/simulate" and request.method == "GET":
+        if len(request.scope.get("query_string", b"")) > MAX_SIMULATION_QUERY_BYTES:
+            return JSONResponse(
+                status_code=414,
+                content={"detail": f"Simulation query exceeds {MAX_SIMULATION_QUERY_BYTES} bytes."},
+            )
+        if not _SIMULATION_SEMAPHORE.acquire(blocking=False):
+            return JSONResponse(
+                status_code=429,
+                content={"detail": "A simulation is already running in this API process; retry shortly."},
+            )
+        try:
+            return await call_next(request)
+        finally:
+            _SIMULATION_SEMAPHORE.release()
+    return await call_next(request)
 
 
 app.add_middleware(
@@ -72,7 +272,10 @@ app.add_middleware(
 def simulate(
     scenario_name: str = "healthy",
     noise_seed: int | None = None,
-    param_overrides: dict[str, float] | None = None,
+    param_overrides: str | None = Query(
+        default=None,
+        description="URL-encoded JSON object mapping supported parameter names to positive finite numbers",
+    ),
     t_end: float = 1.0,
     max_step: float = 1e-4,
     output_dt: float = 1e-4,
@@ -89,6 +292,17 @@ def simulate(
     """
     from imcm.models.fifth_order_dq import CONVENTION_NAME
     from imcm.iot.streaming import MQTTReplayPublisher, SignalWindowBuffer
+
+    parsed_param_overrides = _parse_param_overrides(param_overrides)
+    _validate_simulation_request(
+        t_end=t_end,
+        max_step=max_step,
+        output_dt=output_dt,
+        rtol=rtol,
+        atol=atol,
+        noise_seed=noise_seed,
+        mqtt_chunk_size=mqtt_chunk_size,
+    )
 
     scenario_fn = {
         "healthy": first_milestone_scenario,
@@ -115,11 +329,24 @@ def simulate(
             output_dt=output_dt,
             rtol=rtol,
             atol=atol,
-            param_overrides=param_overrides,
+            param_overrides=parsed_param_overrides,
             noise_seed=noise_seed,
+            max_rhs_evaluations=MAX_SIMULATION_RHS_EVALUATIONS,
         )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Simulation failed: {e}")
+    except SimulationWorkLimitExceeded:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "Simulation exceeded its RHS evaluation budget of "
+                f"{MAX_SIMULATION_RHS_EVALUATIONS}; use a less demanding configuration."
+            ),
+        ) from None
+    except Exception:
+        logger.exception("Simulation failed")
+        raise HTTPException(
+            status_code=500,
+            detail="Simulation failed. Check the API logs for details.",
+        )
 
     three_phase = result.i_abc
     qd0 = [result.i_qs, result.i_ds]
@@ -261,7 +488,7 @@ def simulate(
 
 @app.get("/api/simulate/limits")
 def simulate_limits() -> dict[str, Any]:
-    """Return supported parameter bounds and simulation limits per the planner."""
+    """Return supported numerical bounds and operational request budgets."""
     return {
         "t_end": {"min": 0.1, "max": 60.0, "default": 1.0, "unit": "s"},
         "max_step": {"min": 1.0e-6, "max": 1.0, "default": 1.0e-4, "unit": "s"},
@@ -270,10 +497,13 @@ def simulate_limits() -> dict[str, Any]:
         "atol": {"min": 1.0e-12, "max": 1.0, "default": 1.0e-8},
         "y0": {"default": [0.0, 0.0, 0.0, 0.0, 0.0], "description": "5 initial state values (fluxes, speed)"},
         "param_overrides": {
-            "valid_keys": ["r_s", "r_r", "l_ls", "l_lr", "l_m", "inertia", "viscous_friction"],
-            "description": "Replace corresponding InductionMotorParameters field; all values must be positive",
+            "valid_keys": list(SUPPORTED_PARAM_OVERRIDE_KEYS),
+            "description": "URL-encoded JSON object; replace a parameter field with a finite value greater than zero",
         },
-        "noise_seed": {"description": "Seeded Gaussian-noise injection after simulation; same seed + same config → identical results"},
+        "noise_seed": {
+            "min": 0,
+            "description": "Non-negative integer seed; same seed + same configuration gives identical noise",
+        },
         "scenario": {
             "description": "Scenario name mapping to operating conditions",
             "available": list(CONDITION_FILES.keys()),
@@ -284,13 +514,22 @@ def simulate_limits() -> dict[str, Any]:
             "experimental_validation": False,
         },
         "mqtt_chunk_size": {"min": 10, "max": 10000, "default": 100, "unit": "samples"},
+        "resource_limits": {
+            "max_output_samples": MAX_SIMULATION_OUTPUT_SAMPLES,
+            "max_estimated_solver_steps": MAX_ESTIMATED_SOLVER_STEPS,
+            "max_rhs_evaluations": MAX_SIMULATION_RHS_EVALUATIONS,
+            "max_query_bytes": MAX_SIMULATION_QUERY_BYTES,
+            "max_concurrent_simulations_per_process": MAX_CONCURRENT_SIMULATIONS_PER_PROCESS,
+            "note": "Engineering request budgets; parameter ranges also apply individually",
+        },
         "mqtt_streaming": {
             "description": "When mqtt_enabled=true, simulation traces are chunked into JSON messages with versioned schema and reassembled via window buffer. Health report includes duplicate/gap/out-of-order detection."
         },
     }
 
 
-@app.api_route("/api/ml/analyze", methods=["GET", "POST"])
+@app.get("/api/ml/analyze", operation_id="analyze_ml_dataset_get")
+@app.post("/api/ml/analyze", operation_id="analyze_ml_dataset_post")
 def analyze_ml_dataset() -> dict[str, Any]:
     """Analyze the labeled dataset and report ML readiness.
 
@@ -298,17 +537,52 @@ def analyze_ml_dataset() -> dict[str, Any]:
     This is an exploratory-only analysis; no generalization claims are made.
     """
     import pandas as pd
-    from pathlib import Path
-
-    dataset_path = Path(__file__).resolve().parent.parent / "labeled_dataset.csv"
+    dataset_path = LABELED_DATASET_PATH
 
     if not dataset_path.exists():
         raise HTTPException(
             status_code=404,
-            detail="labeled_dataset.csv not found. Run dataset generation first.",
+            detail=(
+                "ML analysis is unavailable: an explicitly approved labeled_dataset.csv "
+                "with verified provenance and the expected schema is not installed."
+            ),
+        )
+
+    if os.getenv("IMCM_ML_DATASET_APPROVED", "").strip().lower() != "true":
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "ML analysis is disabled until a dataset with verified provenance "
+                "and the expected schema is reviewed and explicitly approved."
+            ),
         )
 
     df = pd.read_csv(dataset_path)
+    required_columns = {"true_label", "scenario_name", "provenance"}
+    missing_columns = sorted(required_columns - set(df.columns))
+    if missing_columns:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "ML analysis dataset has an invalid schema; missing required columns: "
+                + ", ".join(missing_columns)
+            ),
+        )
+    provenance_values = set(df["provenance"].dropna().astype(str).str.strip())
+    invalid_provenance = sorted(provenance_values - ALLOWED_DATASET_LABELS)
+    if df["provenance"].isna().any() or invalid_provenance:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "ML analysis dataset contains missing or unsupported provenance labels; "
+                "allowed labels are simulated, literature-example, and experimental."
+            ),
+        )
+    if df.empty:
+        raise HTTPException(
+            status_code=422,
+            detail="ML analysis dataset must contain at least one labeled record.",
+        )
 
     # Basic analysis
     n_records = len(df)

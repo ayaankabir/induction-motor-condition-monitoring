@@ -186,8 +186,16 @@ The API currently exposes these routes (FastAPI's interactive schema is at
 | `GET /api/ml/interpretations` | Report interpretation capabilities and limitations |
 
 The ML routes expose dataset analysis, configuration, and interpretation status;
-they do not provide a model-training endpoint. The Python ML pipeline is a
-research prototype and its outputs must retain the limitations above.
+they do not provide a model-training endpoint. `POST /api/ml/analyze` returns
+404 when no explicitly approved dataset with verified provenance is installed,
+503 when `IMCM_ML_DATASET_APPROVED=true` has not been set for a present dataset,
+and 422 when an approved dataset is empty or does not meet the required schema
+and provenance-label checks. The root-level dataset is intentionally not
+committed; ML analysis therefore remains unavailable in a deployment until an
+appropriate dataset is reviewed and explicitly approved for that environment.
+The approval flag records an operator decision; it does not independently verify
+data provenance. The Python ML pipeline is a research prototype and its outputs
+must retain the limitations above.
 
 ### Production deployment
 
@@ -203,7 +211,16 @@ Start the read-only API on a Python web host:
 python -m uvicorn api.main:app --app-dir . --host 0.0.0.0 --port "$PORT"
 ```
 
-Set `CORS_ALLOWED_ORIGINS` on the backend to a comma-separated list of exact frontend origins, for example `https://dashboard.example.com`. If it is unset or empty, only `http://localhost:3000` and `http://127.0.0.1:3000` are allowed.
+The simulation endpoint enforces the numerical ranges returned by
+`GET /api/simulate/limits`, a combined maximum of 12,000 output samples,
+100,000 estimated solver steps, 100,000 right-hand-side evaluations per request,
+and a 4,096-byte query-string limit. The API also permits one in-flight
+simulation per process. These are conservative service safeguards, not physical
+model limits. The concurrency bound is process-local; it does not replace
+host-level concurrency controls or rate limiting across multiple workers or
+instances.
+
+The production dashboard origin `https://motor-simulation-data-comparison.vercel.app` is allowed by default. If `CORS_ALLOWED_ORIGINS` is unset or empty, the local development origins `http://localhost:3000` and `http://127.0.0.1:3000` are also allowed. If set, provide a comma-separated list of exact additional frontend origins; those origins are retained and the production dashboard origin is always included. CORS credentials are disabled.
 
 Set `NEXT_PUBLIC_API_BASE_URL` in the frontend deployment to the public backend origin, for example `https://api.example.com`; do not append `/api` because the frontend client adds API paths itself.
 
