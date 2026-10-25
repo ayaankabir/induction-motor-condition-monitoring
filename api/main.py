@@ -806,6 +806,95 @@ def get_ml_interpretations() -> dict[str, Any]:
     }
 
 
+@app.post("/api/ml/train", operation_id="train_ml_model")
+def train_ml_model() -> dict[str, Any]:
+    """Run exploratory Random Forest training on the labeled dataset.
+
+    Returns training metrics, feature importances, and documented limitations.
+    This is an exploratory-only assessment; no generalization claims are made.
+    """
+    import pandas as pd
+    from imcm.ml import run_exploratory_training
+    dataset_path = LABELED_DATASET_PATH
+
+    if not dataset_path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "ML training is unavailable: an explicitly approved labeled_dataset.csv "
+                "with verified provenance and the expected schema is not installed."
+            ),
+        )
+
+    if os.getenv("IMCM_ML_DATASET_APPROVED", "").strip().lower() != "true":
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "ML training is disabled until a dataset with verified provenance "
+                "and the expected schema is reviewed and explicitly approved."
+            ),
+        )
+
+    # Run exploratory training using the existing pipeline
+    pipeline, result, analysis = run_exploratory_training(str(dataset_path))
+
+    if not SKLEARN_AVAILABLE:
+        # Return structured response even when sklearn unavailable
+        return {
+            "sklearn_available": False,
+            "model_trained": False,
+            "message": "scikit-learn not available. Cannot run exploratory training.",
+            "dataset_info": analysis,
+            "limitations": [
+                "scikit-learn not installed",
+                "All results are exploratory-only with explicit limitations.",
+            ],
+        }
+
+    # Build structured response with actual training results
+    response = {
+        "sklearn_available": True,
+        "model_trained": True,
+        "model_type": "RandomForestClassifier",
+        "training_mode": "exploratory_full_dataset",
+        "dataset_info": {
+            "records": analysis.get("class_distribution", {}),
+            "n_records": sum(analysis.get("class_distribution", {}).values()),
+            "n_scenarios": analysis.get("n_scenarios", 0),
+        },
+        "metrics": {
+            "training_accuracy": result.accuracy,
+            "training_macro_f1": result.macro_f1,
+            "per_class_metrics": result.per_class_metrics,
+            "confusion_matrix": result.confusion_matrix.tolist() if result.confusion_matrix is not None else None,
+            "classification_report": result.classification_report_str,
+            "note": "Metrics computed on training data (overfit estimate). Not a held-out test evaluation.",
+        },
+        "feature_importances": result.feature_importances,
+        "baseline_comparison": {
+            name: {
+                "name": br.name,
+                "accuracy": br.accuracy,
+                "macro_f1": br.macro_f1,
+                "per_class_metrics": {str(k): v for k, v in br.per_class_metrics.items()},
+                "confusion_matrix": br.confusion_matrix.tolist() if br.confusion_matrix is not None else None,
+                "classification_report": br.classification_report_str,
+                "warnings": br.warnings,
+            }
+            for name, br in result.baseline_results.items()
+        },
+        "warnings": result.warnings,
+        "limitations": [
+            "Scenario=class confounding: each scenario contains only one class — no valid held-out test set possible",
+            "Only one parameter set: results are motor-specific, not generalizable",
+            "Cannot evaluate generalization to new scenarios",
+            "All results are exploratory-only: trained on training data only",
+        ],
+    }
+
+    return response
+
+
 @app.get("/api/health")
 def health() -> dict[str, Any]:
     return {

@@ -672,6 +672,14 @@ def test_is_vercel_preview_origin_function() -> None:
     assert _is_vercel_preview_origin("https://motor-simulation-data-comparison-git-BRANCH-owner.vercel.app") is False  # Uppercase
 
 
+def test_ml_train_requires_approval(client: TestClient) -> None:
+    """Test that ML training requires IMCM_ML_DATASET_APPROVED=true env var."""
+    response = client.post("/api/ml/train")
+    assert response.status_code == 503
+    detail = response.json()["detail"]
+    assert "ML training is disabled" in detail
+
+
 def test_cors_preflight_rejects_disallowed_origin(client: TestClient) -> None:
     response = client.options(
         "/api/simulate",

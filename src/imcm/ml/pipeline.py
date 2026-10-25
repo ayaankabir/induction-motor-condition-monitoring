@@ -453,13 +453,13 @@ def run_exploratory_training(
     config = config or PipelineConfig()
     pipeline = MLPipeline(config)
 
-    # Load and prepare data
-    df = pipeline.load_dataset(csv_path)
-    X, y, groups = pipeline.prepare_data(df)
-
-    # Check if sklearn is available
+    # Check if sklearn is available before loading data
     if not SKLEARN_AVAILABLE:
         warnings.warn("scikit-learn not available. Running dummy pipeline for demonstration.")
+
+        # Load dataset structure only (no sklearn needed for CSV reading)
+        import pandas as pd
+        df = pd.read_csv(csv_path)
 
         # Create a minimal result that shows the structure
         class DummyModel:
@@ -492,6 +492,10 @@ def run_exploratory_training(
         result.warnings.append(f"Class distribution: {class_dist}")
 
         return pipeline, result, {"class_distribution": class_dist, "n_scenarios": df["scenario_name"].nunique()}
+
+    # Load and prepare data (sklearn is available)
+    df = pipeline.load_dataset(csv_path)
+    X, y, groups = pipeline.prepare_data(df)
 
     # Train on ALL data (exploratory only)
     pipeline.fit(X, y)
