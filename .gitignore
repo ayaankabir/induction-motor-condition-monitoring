@@ -49,5 +49,6 @@ results/*.json
 !results/fault_overview_summary.json
 !results/healthy_startup_provenance.json
 !results/fault_01_stator_resistance_imbalance_provenance.json
-/labeled_dataset.csv
-/src/imcm/labeled_dataset.csv
+
+# ML dataset is explicitly tracked for deployment (simulated data only, reproducible)
+!labeled_dataset.csv
