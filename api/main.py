@@ -2,6 +2,7 @@ import json
 import logging
 import math
 import os
+import re
 import threading
 from dataclasses import dataclass, field
 from decimal import Decimal, ROUND_CEILING, ROUND_FLOOR
@@ -42,7 +43,19 @@ DEFAULT_CORS_ALLOWED_ORIGINS = [
     "https://motor-simulation-data-comparison.vercel.app",
 ]
 
+# Vercel Preview deployment pattern for this project:
+# https://motor-simulation-data-comparison-git-<branch>-<owner>.vercel.app
+VERCEL_PREVIEW_PATTERN = re.compile(
+    r"^https://motor-simulation-data-comparison-git-[a-z0-9-]+-[a-z0-9-]+\.vercel\.app$"
+)
+
+
 LABELED_DATASET_PATH = PROJECT_ROOT / "labeled_dataset.csv"
+
+
+def _is_vercel_preview_origin(origin: str) -> bool:
+    """Check if origin matches this project's Vercel Preview domain pattern."""
+    return bool(VERCEL_PREVIEW_PATTERN.match(origin))
 
 
 def get_cors_allowed_origins() -> list[str]:
@@ -259,13 +272,85 @@ async def guard_simulation_requests(request: Request, call_next):
     return await call_next(request)
 
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=get_cors_allowed_origins(),
-    allow_credentials=False,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
-)
+class VercelPreviewCORSMiddleware:
+    """Custom CORS middleware that supports Vercel Preview domain pattern matching."""
+
+    def __init__(self, app):
+        self.app = app
+        self.allowed_origins = get_cors_allowed_origins()
+        self.allow_credentials = False
+        self.allow_methods = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+        self.allow_headers = ["*"]
+
+    def _is_allowed_origin(self, origin: str) -> bool:
+        """Check if origin is allowed (explicit list or Vercel Preview pattern)."""
+        if origin in self.allowed_origins:
+            return True
+        return _is_vercel_preview_origin(origin)
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        # Extract origin from headers
+        origin = None
+        for header_name, header_value in scope.get("headers", []):
+            if header_name == b"origin":
+                origin = header_value.decode("latin-1")
+                break
+
+        is_preflight = scope["method"] == "OPTIONS"
+
+        if origin and self._is_allowed_origin(origin):
+            # Origin is allowed - add CORS headers to response
+            async def send_with_cors(message):
+                if message["type"] == "http.response.start":
+                    headers = list(message.get("headers", []))
+                    headers.append((b"access-control-allow-origin", origin.encode("latin-1")))
+                    headers.append((b"access-control-allow-credentials", b"false"))
+                    if is_preflight:
+                        headers.append((b"access-control-allow-methods", b"GET, POST, PUT, DELETE, OPTIONS"))
+                        headers.append((b"access-control-allow-headers", b"*"))
+                    message["headers"] = headers
+                await send(message)
+
+            if is_preflight:
+                # Handle preflight request
+                await send({
+                    "type": "http.response.start",
+                    "status": 200,
+                    "headers": [
+                        (b"access-control-allow-origin", origin.encode("latin-1")),
+                        (b"access-control-allow-credentials", b"false"),
+                        (b"access-control-allow-methods", b"GET, POST, PUT, DELETE, OPTIONS"),
+                        (b"access-control-allow-headers", b"*"),
+                    ],
+                })
+                await send({"type": "http.response.body", "body": b""})
+                return
+
+            await self.app(scope, receive, send_with_cors)
+            return
+
+        if is_preflight and origin:
+            # Origin not allowed - reject preflight
+            await send({
+                "type": "http.response.start",
+                "status": 400,
+                "headers": [(b"content-type", b"application/json")],
+            })
+            await send({
+                "type": "http.response.body",
+                "body": b'{"detail": "CORS preflight rejected: origin not allowed"}',
+            })
+            return
+
+        # For non-preflight requests with disallowed origins, pass through without CORS headers
+        await self.app(scope, receive, send)
+
+
+app.add_middleware(VercelPreviewCORSMiddleware)
 
 
 @app.get("/api/simulate")

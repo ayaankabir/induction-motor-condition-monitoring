@@ -530,7 +530,8 @@ def test_production_origin_allows_simulation_get_and_ml_post_preflight(
         assert response.status_code == 200
         assert response.headers["access-control-allow-origin"] == origin
         assert method in response.headers["access-control-allow-methods"]
-        assert "content-type" in response.headers["access-control-allow-headers"].lower()
+        # allow_headers returns "*" which covers all headers including content-type
+        assert response.headers["access-control-allow-headers"] == "*"
 
 
 def test_cors_configured_origins_are_preserved_and_production_origin_added(
@@ -543,6 +544,102 @@ def test_cors_configured_origins_are_preserved_and_production_origin_added(
         "https://other.example",
         "https://motor-simulation-data-comparison.vercel.app",
     ]
+
+
+def test_cors_preflight_rejects_disallowed_origin(client: TestClient) -> None:
+    response = client.options(
+        "/api/simulate",
+        headers={
+            "Origin": "https://unapproved.example",
+            "Access-Control-Request-Method": "GET",
+        },
+    )
+
+    assert response.status_code == 400
+    assert "access-control-allow-origin" not in response.headers
+
+
+def test_vercel_preview_origin_allowed(client: TestClient) -> None:
+    """Test that Vercel Preview deployment origins are allowed via pattern matching."""
+    preview_origin = "https://motor-simulation-data-comparison-git-feature-branch-owner123.vercel.app"
+    response = client.options(
+        "/api/simulate/limits",
+        headers={
+            "Origin": preview_origin,
+            "Access-Control-Request-Method": "GET",
+            "Access-Control-Request-Headers": "content-type",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == preview_origin
+    assert "GET" in response.headers["access-control-allow-methods"]
+
+
+def test_vercel_preview_origin_allows_get_request(client: TestClient) -> None:
+    """Test that GET requests from Vercel Preview origins receive CORS headers."""
+    preview_origin = "https://motor-simulation-data-comparison-git-main-user456.vercel.app"
+    response = client.get(
+        "/api/simulate/limits",
+        headers={"Origin": preview_origin},
+    )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == preview_origin
+
+
+def test_vercel_preview_origin_allows_post_request(client: TestClient) -> None:
+    """Test that POST requests from Vercel Preview origins receive CORS headers."""
+    preview_origin = "https://motor-simulation-data-comparison-git-develop-team789.vercel.app"
+    response = client.post(
+        "/api/ml/analyze",
+        headers={"Origin": preview_origin, "Content-Type": "application/json"},
+        json={},
+    )
+
+    # Note: ML endpoint may return 404/503 due to missing dataset, but CORS headers should be present
+    assert response.headers["access-control-allow-origin"] == preview_origin
+
+
+def test_vercel_preview_pattern_rejects_invalid_domains(client: TestClient) -> None:
+    """Test that invalid Vercel-like domains are rejected."""
+    invalid_origins = [
+        "https://other-project-git-branch-owner.vercel.app",  # Different project name
+        "https://motor-simulation-data-comparison-git-branch.vercel.app",  # Missing owner
+        "https://motor-simulation-data-comparison-git-owner.vercel.app",  # Missing branch
+        "https://evil.com/motor-simulation-data-comparison-git-branch-owner.vercel.app",  # Subdomain injection
+        "https://motor-simulation-data-comparison-git-BRANCH-OWNER.vercel.app",  # Uppercase not allowed
+    ]
+
+    for origin in invalid_origins:
+        response = client.options(
+            "/api/simulate/limits",
+            headers={
+                "Origin": origin,
+                "Access-Control-Request-Method": "GET",
+            },
+        )
+        assert response.status_code == 400, f"Origin {origin} should be rejected"
+        assert "access-control-allow-origin" not in response.headers
+
+
+def test_is_vercel_preview_origin_function() -> None:
+    """Test the pattern matching function directly."""
+    from api.main import _is_vercel_preview_origin
+
+    # Valid preview origins
+    assert _is_vercel_preview_origin("https://motor-simulation-data-comparison-git-feature-branch-owner123.vercel.app") is True
+    assert _is_vercel_preview_origin("https://motor-simulation-data-comparison-git-main-user.vercel.app") is True
+    assert _is_vercel_preview_origin("https://motor-simulation-data-comparison-git-fix-bug-john.vercel.app") is True
+
+    # Invalid origins
+    assert _is_vercel_preview_origin("https://motor-simulation-data-comparison.vercel.app") is False  # Production
+    assert _is_vercel_preview_origin("https://other-project-git-branch-owner.vercel.app") is False
+    assert _is_vercel_preview_origin("https://motor-simulation-data-comparison-git-branch.vercel.app") is False
+    assert _is_vercel_preview_origin("https://motor-simulation-data-comparison-git-owner.vercel.app") is False
+    assert _is_vercel_preview_origin("https://evil.com/motor-simulation-data-comparison-git-branch-owner.vercel.app") is False
+    assert _is_vercel_preview_origin("http://motor-simulation-data-comparison-git-branch-owner.vercel.app") is False  # HTTP not HTTPS
+    assert _is_vercel_preview_origin("https://motor-simulation-data-comparison-git-BRANCH-owner.vercel.app") is False  # Uppercase
 
 
 def test_cors_preflight_rejects_disallowed_origin(client: TestClient) -> None:
