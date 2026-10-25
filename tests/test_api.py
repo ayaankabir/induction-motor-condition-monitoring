@@ -560,7 +560,7 @@ def test_cors_preflight_rejects_disallowed_origin(client: TestClient) -> None:
 
 
 def test_vercel_preview_origin_allowed(client: TestClient) -> None:
-    """Test that Vercel Preview deployment origins are allowed via pattern matching."""
+    """Test that Vercel Preview deployment origins are allowed via pattern matching (git-based)."""
     preview_origin = "https://motor-simulation-data-comparison-git-feature-branch-owner123.vercel.app"
     response = client.options(
         "/api/simulate/limits",
@@ -574,6 +574,36 @@ def test_vercel_preview_origin_allowed(client: TestClient) -> None:
     assert response.status_code == 200
     assert response.headers["access-control-allow-origin"] == preview_origin
     assert "GET" in response.headers["access-control-allow-methods"]
+
+
+def test_vercel_preview_hash_based_origin_allowed(client: TestClient) -> None:
+    """Test that hash-based Vercel Preview URLs (actual deployed format) are allowed."""
+    # This matches the actual deployed Preview URL format: https://motor-simulation-data-comparison-c302cbh94.vercel.app
+    preview_origin = "https://motor-simulation-data-comparison-c302cbh94.vercel.app"
+    response = client.options(
+        "/api/simulate/limits",
+        headers={
+            "Origin": preview_origin,
+            "Access-Control-Request-Method": "GET",
+            "Access-Control-Request-Headers": "content-type",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == preview_origin
+    assert "GET" in response.headers["access-control-allow-methods"]
+
+
+def test_vercel_preview_hash_based_allows_get_request(client: TestClient) -> None:
+    """Test that GET requests from hash-based Vercel Preview origins receive CORS headers."""
+    preview_origin = "https://motor-simulation-data-comparison-c302cbh94.vercel.app"
+    response = client.get(
+        "/api/simulate/limits",
+        headers={"Origin": preview_origin},
+    )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == preview_origin
 
 
 def test_vercel_preview_origin_allows_get_request(client: TestClient) -> None:

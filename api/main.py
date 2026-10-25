@@ -43,10 +43,11 @@ DEFAULT_CORS_ALLOWED_ORIGINS = [
     "https://motor-simulation-data-comparison.vercel.app",
 ]
 
-# Vercel Preview deployment pattern for this project:
-# https://motor-simulation-data-comparison-git-<branch>-<owner>.vercel.app
+# Vercel Preview deployment patterns for this project:
+# 1. Git-based: https://motor-simulation-data-comparison-git-<branch>-<owner>.vercel.app
+# 2. Hash-based: https://motor-simulation-data-comparison-<hash>.vercel.app
 VERCEL_PREVIEW_PATTERN = re.compile(
-    r"^https://motor-simulation-data-comparison-git-[a-z0-9-]+-[a-z0-9-]+\.vercel\.app$"
+    r"^https://motor-simulation-data-comparison(-git-[a-z0-9-]+-[a-z0-9-]+|-[a-z0-9]+)\.vercel\.app$"
 )
 
 
